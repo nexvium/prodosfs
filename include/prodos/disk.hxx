@@ -32,9 +32,9 @@ public:
     ssize_t ToOffset(const void *addr) const;
 
 private:
-    void *_base;
-    size_t _size;
-    int _num_blocks;
+    void *      _base;
+    size_t      _size;
+    int         _num_blocks;
 };
 
 } // namespace

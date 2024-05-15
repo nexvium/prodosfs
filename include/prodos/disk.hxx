@@ -19,8 +19,12 @@ public:
     const size_t BLOCK_SIZE = SECTOR_SIZE * 2;
 
     disk_t(const std::string &pathname);
+    disk_t(const disk_t &)                  = delete;
+    disk_t(const disk_t &&)                 = delete;
 
     virtual ~disk_t();
+
+    disk_t &    operator=(const disk_t &)   = delete;
 
     const void *GetBlock(int index) const;
 
@@ -34,7 +38,10 @@ public:
 private:
     void *      _base;
     size_t      _size;
-    int         _num_blocks;
+    unsigned    _num_blocks;
+    bool        _converted;
+
+    void _ReadRwtsBlock(size_t index, void *block);
 };
 
 } // namespace

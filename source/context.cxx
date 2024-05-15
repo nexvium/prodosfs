@@ -9,6 +9,12 @@
 namespace prodos
 {
 
+context_t::context_t(const std::string & pathname)
+    : _disk(pathname)
+{
+
+}
+
 } // namespace
 
 // eof

@@ -61,6 +61,9 @@ class context_t
 {
 public:
     context_t(const std::string & pathname);
+    context_t(const context_t &)                = delete;
+    context_t(const context_t &&)               = delete;
+
     virtual ~context_t();
 
     std::string     GetVolumeName(void) const;

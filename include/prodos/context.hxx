@@ -43,9 +43,18 @@ public:
 class directory_t
 {
 public:
-    void    Close(void);
+    void                Close(void);
 
-    const entry_t *     NextEntry();
+    const entry_t *     NextEntry() const;
+};
+
+class file_t
+{
+public:
+    void                Close(void);
+    size_t              Read(void *buffer, size_t size) const;
+    bool                Eof(void) const;
+    off_t               Seek(off_t offset, int whence);
 };
 
 class context_t
@@ -59,6 +68,8 @@ public:
     entry_t *       GetEntry(const std::string & pathname) const;
 
     directory_t *   OpenDirectory(const std::string & pathname) const;
+
+    file_t *        OpenFile(const std::string & pathname) const;
 
     err_t           Error(void) const;
 

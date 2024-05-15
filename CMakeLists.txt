@@ -21,13 +21,13 @@ add_executable(
     main.cxx
     include/prodos.hxx
     include/prodos/block.hxx
+    include/prodos/context.hxx
     include/prodos/disk.hxx
     include/prodos/entry.hxx
-    include/prodos/system.hxx
     include/prodos/util.hxx
     source/block.cxx
+    source/context.cxx
     source/disk.cxx
     source/entry.cxx
-    source/system.cxx
     source/util.cxx
 )

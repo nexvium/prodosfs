@@ -70,6 +70,67 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     return 0;
 }
 
+static int prodosfs_open(const char *path, struct fuse_file_info * fi)
+{
+    LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
+
+    auto fh = context->OpenFile(path);
+    if (fh == nullptr) {
+        return -ToErrno(context->Error());
+    }
+
+    fi->fh = reinterpret_cast<uintptr_t>(fh);
+
+    return 0;
+}
+
+static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, struct fuse_file_info * fi)
+{
+    LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %z, %p)", path, off, fi);
+
+    auto fh = reinterpret_cast<file_t *>(fi->fh);
+    auto pos = fh->Seek(off, SEEK_SET);
+    if (pos < 0) {
+        return -ToErrno(context->Error());
+    }
+
+    size_t n = fh->Read(buf, bufsiz);
+    if (n == 0 && fh->Eof() == false) {
+        return -ToErrno(context->Error());
+    }
+
+    return (int)n;
+}
+
+static int prodosfs_release(const char *path, struct fuse_file_info *fi)
+{
+    LogMessage(LOG_DEBUG1, "prodosfs_release(\"%s\", %p)", path, fi);
+
+    auto fh = reinterpret_cast<file_t *>(fi->fh);
+    fh->Close();
+    delete fh;
+
+    return 0;
+}
+
+static int prodosfs_getxattr(const char *path, const char *name, char *value, size_t size)
+{
+    LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p)", path, name, value);
+
+    // TODO
+
+    return 0;
+}
+
+static int prodosfs_listxattr(const char *path, char *buf, size_t size)
+{
+    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\",  %p)", path, buf);
+
+    // TODO
+
+    return 0;
+}
+
 static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
     LogMessage(LOG_DEBUG1, "prodosfs_init()");
@@ -113,13 +174,13 @@ static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-static int prodos_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
-                          fuse_file_info *fi, fuse_readdir_flags fl)
+static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
+                            fuse_file_info *fi, fuse_readdir_flags fl)
 {
     LogMessage(LOG_DEBUG1, "prodos_readdir(\"%s\", %p, %d)", path, buf, offset);
 
     if (offset == 0) {
-        filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_PLUS);
+        filler(buf, ".", nullptr, 0, FUSE_FILL_DIR_PLUS);
         filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_PLUS);
     }
 
@@ -152,12 +213,16 @@ static int prodosfs_releasedir(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-
 static struct fuse_operations operations =
 {
     .getattr    = prodosfs_getattr,
+    .open       = prodosfs_open,
+    .read       = prodosfs_read,
+    .release    = prodosfs_release,
+    .getxattr   = prodosfs_getxattr,
+    .listxattr  = prodosfs_listxattr,
     .opendir    = prodosfs_opendir,
-    .readdir    = prodos_readdir,
+    .readdir    = prodosfs_readdir,
     .releasedir = prodosfs_releasedir,
     .init       = prodosfs_init,
     .destroy    = prodosfs_destroy,
@@ -180,9 +245,11 @@ int main(int argc, char *argv[])
     disk_image = argv[3];
     argc--;
 
-    prodos::SetLogger(LogMessage);
+    SetLogger(LogMessage);
 
     rv = fuse_main(argc, argv, &operations, nullptr);
 
     return rv;
 }
+
+// eof

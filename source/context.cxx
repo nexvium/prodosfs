@@ -4,7 +4,7 @@
 ** Copyright 2024 by Javier Alvarado.
 */
 
-#include "prodos/system.hxx"
+#include "prodos/context.hxx"
 
 namespace prodos
 {

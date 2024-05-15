@@ -8,9 +8,9 @@
 #define PRODOSFS_PRODOS_HXX
 
 #include "prodos/block.hxx"
+#include "prodos/context.hxx"
 #include "prodos/disk.hxx"
 #include "prodos/entry.hxx"
-#include "prodos/system.hxx"
 #include "prodos/util.hxx"
 
 #endif // PRODOSFS_PRODOS_HXX

@@ -7,6 +7,8 @@
 #ifndef PRODOSFS_ENTRY_HXX
 #define PRODOSFS_ENTRY_HXX
 
+#include <stdint.h>
+
 namespace prodos
 {
 

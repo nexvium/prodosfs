@@ -8,13 +8,12 @@
 #define PRODOSFS_SYSTEM_HXX
 
 #include "prodos/disk.hxx"
+#include "block.hxx"
 
 #include <string>
 
 namespace prodos
 {
-
-const size_t    NAME_MAX_LEN    = 15;
 
 enum err_t
 {
@@ -32,6 +31,18 @@ enum err_t
     err_position_out_of_range       = 0x4D,
     err_directory_structure_damaged = 0x51,
     err_file_structure_damaged      = 0x54,
+};
+
+enum storage_type_t
+{
+    storage_type_none           = 0x0,
+    storage_type_seedling_file  = 0x1,
+    storage_type_sapling_file   = 0x2,
+    storage_type_tree_file      = 0x3,
+    storage_type_pascal_area    = 0x4,
+    storage_type_subdirectory   = 0xD,
+    storage_type_subdir_block   = 0xE,
+    storage_type_volume_block   = 0xF,
 };
 
 class entry_t
@@ -64,7 +75,7 @@ public:
     context_t(const context_t &)                = delete;
     context_t(const context_t &&)               = delete;
 
-    virtual ~context_t();
+    ~context_t();
 
     std::string     GetVolumeName(void) const;
 
@@ -78,6 +89,8 @@ public:
 
 private:
     disk_t  _disk;
+
+    const directory_block_t *   _GetVolumeDirectoryBlock(void);
 };
 
 } // namespace

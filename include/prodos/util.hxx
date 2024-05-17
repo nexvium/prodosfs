@@ -10,6 +10,20 @@
 namespace prodos
 {
 
+template <typename T, typename D>
+class liberator_t
+{
+public:
+    liberator_t(T value, D liberator): _value(value), _liberator(liberator) { }
+    ~liberator_t() { _liberator(_value); }
+    liberator_t(const liberator_t &)                = delete;
+    liberator_t &   operator=(const liberator_t &)  = delete;
+
+private:
+    T   _value;
+    D   _liberator;
+};
+
 enum log_level_t
 {
     LOG_CRITICAL,   // 0

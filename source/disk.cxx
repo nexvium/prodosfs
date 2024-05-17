@@ -24,6 +24,9 @@ const int   TRACKS_PER_DISK     = 35;
 const int   SECTORS_PER_TRACK   = 16;
 const int   BLOCKS_PER_TRACK    = SECTORS_PER_TRACK / 2;
 
+#define BLOCK_ADDR(i)   ((char *)_base + (i) * BLOCK_SIZE)
+#define SECTOR_ADDR(i)  ((char *)_base + (i) * SECTOR_SIZE)
+
 disk_t::disk_t(const std::string & pathname)
     : _base(nullptr), _size(0), _num_blocks(0), _converted(false)
 {
@@ -46,12 +49,14 @@ disk_t::disk_t(const std::string & pathname)
 
     _base = mmap(nullptr, st.st_size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
     if (_base == nullptr) {
+        close(fd);
         throw std::runtime_error("unable to memory map image file");
     }
-    close(fd);
 
     _size = st.st_size;
     _num_blocks = _size / BLOCK_SIZE;
+
+    close(fd);
 }
 
 disk_t::~disk_t()
@@ -65,17 +70,27 @@ disk_t::~disk_t()
 }
 
 const void *
-disk_t::GetBlock(int index) const
+disk_t::ReadBlock(int index) const
 {
     if (index < 0 || index >= _num_blocks) {
         throw std::runtime_error("invalid block number");
     }
 
-    return (uint8_t *)_base + index * BLOCK_SIZE;
+    return BLOCK_ADDR(index);
+}
+
+void
+disk_t::WriteBlock(int index, const void * block)
+{
+    if (index < 0 || index >= _num_blocks) {
+        throw std::runtime_error("invalid block number");
+    }
+
+    memcpy(BLOCK_ADDR(index), block, BLOCK_SIZE);
 }
 
 const void *
-disk_t::GetTrackSector(int track, int sector) const
+disk_t::ReadTrackSector(int track, int sector) const
 {
     if (track < 0 || track >= TRACKS_PER_DISK) {
         throw std::runtime_error("invalid track number");
@@ -86,7 +101,7 @@ disk_t::GetTrackSector(int track, int sector) const
 
     auto index = track * SECTORS_PER_TRACK + sector;
 
-    return (uint8_t *)_base + index * SECTOR_SIZE;
+    return SECTOR_ADDR(index);
 }
 
 void
@@ -99,8 +114,8 @@ disk_t::_ReadRwtsBlock(size_t index, void * block)
     auto sector1 = map1[index % BLOCKS_PER_TRACK];
     auto sector2 = map2[index % BLOCKS_PER_TRACK];
     auto blk_offset = index * BLOCK_SIZE;
-    auto src1_offset = (SECTORS_PER_TRACK * track + sector1) * SECTOR_SIZE;
-    auto src2_offset = (SECTORS_PER_TRACK * track + sector2) * SECTOR_SIZE;
+    auto src1_offset = (track * SECTORS_PER_TRACK + sector1) * SECTOR_SIZE;
+    auto src2_offset = (track * SECTORS_PER_TRACK + sector2) * SECTOR_SIZE;
     LOG(LOG_DEBUG3, "assembling block %03lu [%06lx] from track %02lu, sectors %02d [%06zx] and %02d [%06zx]",
                     index, blk_offset, track, sector1, src1_offset, sector2, src2_offset);
 

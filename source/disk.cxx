@@ -35,28 +35,25 @@ disk_t::disk_t(const std::string & pathname)
         throw std::runtime_error(std::string("unable to open image file: ") + strerror(errno));
     }
 
+    liberator_t<int, int (*)(int)> liberator(fd, close);
+
     struct stat st = {};
     fstat(fd, &st);
     if (!S_ISREG(st.st_mode)) {
-        close(fd);
         throw std::runtime_error("image is not a regular file");
     }
 
     if (st.st_size % BLOCK_SIZE != 0) {
-        close(fd);
         throw std::runtime_error("image size is not a multiple of block size");
     }
 
     _base = mmap(nullptr, st.st_size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
     if (_base == nullptr) {
-        close(fd);
         throw std::runtime_error("unable to memory map image file");
     }
 
     _size = st.st_size;
     _num_blocks = _size / BLOCK_SIZE;
-
-    close(fd);
 }
 
 disk_t::~disk_t()

@@ -7,6 +7,12 @@
 #ifndef PRODOSFS_UTIL_HXX
 #define PRODOSFS_UTIL_HXX
 
+#include <string>
+
+#include <stdint.h>
+
+#define UNIMPLEMENTED std::logic_error(std::string(__FILE__ ":") + std::to_string(__LINE__) + ": UNIMPLEMENTED!");
+
 namespace prodos
 {
 
@@ -42,6 +48,18 @@ typedef void (*Logger)(int level, const char *format, ...);
 extern Logger LOG;
 
 void SetLogger(Logger func);
+
+inline uint16_t LE_Read16(const uint8_t *p)
+{
+    return *(p + 1) << 8 | *(p + 0);
+}
+
+inline uint32_t LE_Read24(const uint8_t *p)
+{
+    return *(p + 2) << 16 | *(p + 1) << 8 | *(p + 0);
+}
+
+void DumpBlock(const void *ptr);
 
 } // namespace
 

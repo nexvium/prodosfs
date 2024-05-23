@@ -7,14 +7,23 @@
 #ifndef PRODOS_BLOCK_HXX
 #define PRODOS_BLOCK_HXX
 
+/*
+** This header describes ProDOS' on-disk block format.
+*/
+
 #include <stddef.h>
 #include <stdint.h>
 
 namespace prodos
 {
-const int   BLOCK_SIZE          = 512;
+const int   BLOCK_SIZE          =  512;
+const int   ENTRIES_PER_BLOCK   =   13;
 
-struct directory_header_t
+/*
+** The directory header is the first entry in a volume or subdirectory key block
+** and describes the current directory.
+*/
+struct directory_header
 {
     uint8_t storage_type_and_name_length;
     union
@@ -46,7 +55,10 @@ struct directory_header_t
     };
 };
 
-struct file_entry_t
+/*
+** A file entry describes a file or subdirectory in the current directory.
+*/
+struct directory_entry
 {
     uint8_t storage_type_and_name_length;
     uint8_t file_name[15];
@@ -63,7 +75,12 @@ struct file_entry_t
     uint8_t header_pointer[2];
 };
 
-struct directory_block_t
+/*
+** A directory block describes the contents of a directory.  The first entry in a key block
+** (i.e. the first block for the directory) is a header.  All subsequent entries are
+** directory entries.
+*/
+struct directory_block
 {
     uint8_t                     prev[2];
     uint8_t                     next[2];
@@ -71,23 +88,15 @@ struct directory_block_t
     {
         struct
         {
-            directory_header_t  header;
-            file_entry_t        entry[14];
+            directory_header    header;
+            directory_entry     entry[14];
         } key;
         struct
         {
-            file_entry_t        entry[15];
+            directory_entry     entry[15];
         } any;
     };
     uint8_t                     unused;
-
-public:
-    static const directory_block_t *  Create(const void *addr);
-
-    directory_block_t(void)                                     = delete;
-    directory_block_t(const directory_block_t &)                = delete;
-    directory_block_t & operator=(const directory_block_t &)    = delete;
-    ~directory_block_t()                                        = delete;
 };
 
 } // namespace

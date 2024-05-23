@@ -12,6 +12,7 @@
 #include <fuse.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "prodos.hxx"
 
@@ -39,7 +40,7 @@ int ToErrno(err_t err)
     static std::unordered_map<err_t, int> errors = {
             { err_none,                     0       },
             { err_position_out_of_range,    EBADF   },
-            { err_directory_not_found,      ENOENT  },
+            { err_directory_not_found,      ENOTDIR },
             { err_volume_not_found,         ENOENT  },
             { err_file_not_found,           ENOENT  },
             { err_end_of_file,              0       },
@@ -54,6 +55,20 @@ int ToErrno(err_t err)
     return itr->second;
 }
 
+static time_t L_ToUnixTime(const timestamp_t & timestamp)
+{
+    struct tm tm = {};
+
+    tm.tm_min  = timestamp.minute;
+    tm.tm_hour = timestamp.hour;
+    tm.tm_mday = timestamp.day;
+    tm.tm_mon  = timestamp.month - 1;
+    tm.tm_year = timestamp.year < 70 ? timestamp.year + 100
+                                     : timestamp.year;
+
+    return mktime(&tm);
+}
+
 /*=================================================================================================
 ** FUSE operations.
 */
@@ -65,6 +80,35 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
         return -ToErrno(context->Error());
+    }
+
+    st->st_nlink = 1;
+    st->st_uid = getuid();
+    st->st_gid = getgid();
+    st->st_blksize = BLOCK_SIZE;
+    st->st_mode = S_IRUSR | S_IRGRP;
+
+    // POSIX has no notion of "file creation time" and ProDOS has no notion of
+    // "inode change time", so report the creation time as the change time.
+    st->st_ctim.tv_sec = L_ToUnixTime(entry->CreationTimestamp());
+
+    if (entry->IsRoot()) {
+        st->st_blocks = context->CountVolumeDirectoryBlocks();
+        st->st_size = st->st_blocks * st->st_blksize;
+        st->st_mode |= S_IFDIR | S_IXUSR | S_IXGRP;
+
+        // ProDOS does not track modification time, so use creation time.
+        st->st_mtim.tv_sec = L_ToUnixTime(entry->CreationTimestamp());
+    }
+    else if (entry->IsFile() || entry->IsDirectory()) {
+        auto file = (directory_entry_t *)entry;
+        st->st_blocks = file->BlocksUsed();
+        st->st_size = file->Eof();
+        st->st_mode |= entry->IsFile() ? S_IFREG : S_IFDIR | S_IXUSR | S_IXGRP;
+        st->st_mtim.tv_sec = L_ToUnixTime(file->LastModTimestamp());
+    }
+    else {
+        throw std::runtime_error("unexpected storage type");
     }
 
     return 0;
@@ -88,7 +132,7 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
 {
     LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %z, %p)", path, off, fi);
 
-    auto fh = reinterpret_cast<file_t *>(fi->fh);
+    auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     auto pos = fh->Seek(off, SEEK_SET);
     if (pos < 0) {
         return -ToErrno(context->Error());
@@ -106,7 +150,7 @@ static int prodosfs_release(const char *path, struct fuse_file_info *fi)
 {
     LogMessage(LOG_DEBUG1, "prodosfs_release(\"%s\", %p)", path, fi);
 
-    auto fh = reinterpret_cast<file_t *>(fi->fh);
+    auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     fh->Close();
     delete fh;
 
@@ -184,7 +228,7 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_PLUS);
     }
 
-    auto dh = reinterpret_cast<directory_t *>(fi->fh);
+    auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     const entry_t *entry = nullptr;
     while ((entry = dh->NextEntry()) != nullptr) {
         std::string name = entry->FileName();
@@ -206,7 +250,7 @@ static int prodosfs_releasedir(const char *path, struct fuse_file_info *fi)
 {
     LogMessage(LOG_DEBUG1, "prodosfs_releasedir(\"%s\", %p)", path, fi);
 
-    auto dh = reinterpret_cast<directory_t *>(fi->fh);
+    auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     dh->Close();
     delete dh;
 
@@ -238,7 +282,7 @@ int main(int argc, char *argv[])
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
     if (argc != 4) {
-        fprintf(stderr, "usage: prodosfs -f <mount_dir> <image_file>");
+        fprintf(stderr, "usage: prodosfs -f <mount_dir> <image_file>\n");
         exit(EXIT_FAILURE);
     }
 

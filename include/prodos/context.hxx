@@ -7,10 +7,12 @@
 #ifndef PRODOSFS_SYSTEM_HXX
 #define PRODOSFS_SYSTEM_HXX
 
+#include "prodos/directory.hxx"
 #include "prodos/disk.hxx"
-#include "block.hxx"
+#include "prodos/entry.hxx"
+#include "prodos/file.hxx"
 
-#include <string>
+//#include <string>
 
 namespace prodos
 {
@@ -29,8 +31,11 @@ enum err_t
     err_unsupported_storage_type    = 0x4B,
     err_end_of_file                 = 0x4C,
     err_position_out_of_range       = 0x4D,
+    err_file_access_error           = 0x4E,
     err_directory_structure_damaged = 0x51,
     err_file_structure_damaged      = 0x54,
+
+    err_prodosfs_not_a_directory    = 0xFF,
 };
 
 enum storage_type_t
@@ -45,52 +50,52 @@ enum storage_type_t
     storage_type_volume_block   = 0xF,
 };
 
-class entry_t
+enum file_type_t
 {
-public:
-    std::string FileName(void) const;
-};
-
-class directory_t
-{
-public:
-    void                Close(void);
-
-    const entry_t *     NextEntry() const;
-};
-
-class file_t
-{
-public:
-    void                Close(void);
-    size_t              Read(void *buffer, size_t size) const;
-    bool                Eof(void) const;
-    off_t               Seek(off_t offset, int whence);
+    file_type_none              = 0x00,
+    file_type_text              = 0x04,
+    file_type_binary            = 0x06,
+    file_type_directory         = 0x0F,
+    file_type_appleworks_db     = 0x19,
+    file_type_appleworks_wp     = 0x20,
+    file_type_appleworks_ss     = 0x21,
+    file_type_integer_basic     = 0xFA,
+    file_type_applesoft_basic   = 0xFC,
+    file_type_prodos_system     = 0xFF,
 };
 
 class context_t
 {
 public:
-    context_t(const std::string & pathname);
+    explicit context_t(const std::string & pathname);
     context_t(const context_t &)                = delete;
     context_t(const context_t &&)               = delete;
 
-    ~context_t();
+    ~context_t()                                = default;
 
-    std::string     GetVolumeName(void) const;
+    std::string             GetVolumeName() const;
 
-    entry_t *       GetEntry(const std::string & pathname) const;
+    // Returns the directory entry for the given pathname, if found,
+    // EXCEPT when the pathname is "/", in which case the volume
+    // directory header is returned.
+    const entry_t *         GetEntry(const std::string & pathname) const;
 
-    directory_t *   OpenDirectory(const std::string & pathname) const;
+    directory_handle_t *    OpenDirectory(const std::string & pathname) const;
 
-    file_t *        OpenFile(const std::string & pathname) const;
+    file_handle_t *         OpenFile(const std::string & pathname) const;
 
-    err_t           Error(void) const;
+    static err_t            Error();
+    const void *            GetBlock(int index) const;
+    int                     GetBlocksUsed(const entry_t * entry) const;
+
+    int                     CountVolumeBlocksUsed()         const;
+    int                     CountVolumeDirectoryBlocks()    const;
 
 private:
-    disk_t  _disk;
+    disk_t                      _disk;
+    const directory_block *     _root;
 
-    const directory_block_t *   _GetVolumeDirectoryBlock(void);
+    const directory_block *     _GetVolumeDirectoryBlock();
 };
 
 } // namespace

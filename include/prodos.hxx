@@ -7,7 +7,6 @@
 #ifndef PRODOSFS_PRODOS_HXX
 #define PRODOSFS_PRODOS_HXX
 
-#include "prodos/block.hxx"
 #include "prodos/context.hxx"
 #include "prodos/disk.hxx"
 #include "prodos/entry.hxx"

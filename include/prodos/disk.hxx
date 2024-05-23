@@ -31,6 +31,11 @@ public:
 
     const void *    ReadTrackSector(int track, int sector) const;
 
+    unsigned        NumBlocks(void) const
+    {
+        return  _num_blocks;
+    }
+
     enum convert_t { RWTS_TO_BLOCK };
     void Convert(convert_t direction);
 

@@ -6,19 +6,24 @@
 
 #include "prodos/context.hxx"
 
+#include "prodos/block.hxx"
+#include "prodos/util.hxx"
+#include "prodos/directory.hxx"
+
+#include <memory>
 #include <stdexcept>
+#include <vector>
 
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "prodos/block.hxx"
-#include "prodos/util.hxx"
-
 namespace prodos
 {
 
-static thread_local err_t error = err_none;
+typedef std::vector<std::string>    strings_t;
+
+thread_local err_t error = err_none;
 
 static void
 L_Deobfuscate(const void *src_blk, void * dst_blk)
@@ -60,16 +65,22 @@ L_Deobfuscate(const void *src_blk, void * dst_blk)
         LOG(LOG_ERROR, "password file is empty");
         return;
     }
-    else if (n < 2) {
-        LOG(LOG_ERROR, "password is too short");
-        return;
+    else {
+        if (passwd[n - 1] == '\n') {
+            passwd[n - 1] = 0;
+            n--;
+        }
+        if (n < 2) {
+            LOG(LOG_ERROR, "password is too short");
+            return;
+        }
     }
 
-    auto cipher = (const char *)src_blk;
-    auto plain = (char *)dst_blk;
+    auto cipher = (const unsigned char *)src_blk;
+    auto plain = (unsigned char *)dst_blk;
     auto ptr = passwd;
     for (int i = 0; i < BLOCK_SIZE; i++) {
-        plain[i] = (char)(cipher[i] ^ *ptr++);
+        plain[i] = (char)(cipher[i] ^ (*ptr++ ^ 0x7F));
 
         // There's an off-by-one error in the program I wrote 30+ years
         // ago, so the last character of the password is not used.
@@ -78,7 +89,7 @@ L_Deobfuscate(const void *src_blk, void * dst_blk)
         }
     }
 
-    if (plain[0] != 0 || plain[1] != 0 || plain[4] >> 4 != storage_type_volume_block) {
+    if (plain[0] != 0 || plain[1] != 0 || (plain[4] >> 4 != storage_type_volume_block)) {
         LOG(LOG_DEBUG1, "disk is not protected with password");
     }
 
@@ -88,42 +99,200 @@ L_Deobfuscate(const void *src_blk, void * dst_blk)
 context_t::context_t(const std::string & pathname)
     : _disk(pathname)
 {
-    const directory_block_t *   dir_blk = _GetVolumeDirectoryBlock();
-    if (dir_blk == nullptr) {
+    _root = _GetVolumeDirectoryBlock();
+    if (_root == nullptr) {
         throw std::runtime_error("unable to find volume directory block");
     }
 
+    auto volume = volume_header_t::Create(&_root->key.header);
+    if (volume->MinVersion() != 0) {
+        throw std::runtime_error("unexpected minimum prodos version");
+    }
+    else if (volume->EntriesPerBlock() != ENTRIES_PER_BLOCK) {
+        throw std::runtime_error("unexpected number of entries per block");
+    }
+    else if (volume->EntryLength() != sizeof(directory_entry)) {
+        throw std::runtime_error("unexpected entry length");
+    }
+    else if (volume->TotalBlocks() != _disk.NumBlocks()) {
+        throw std::runtime_error("unexpected total blocks");
+    }
 }
 
-const directory_block_t *
-context_t::_GetVolumeDirectoryBlock(void)
+err_t
+context_t::Error()
+{
+    return error;
+}
+
+static bool
+L_IsVolumeDirectoryBlock(const void *addr)
+{
+    auto block = (const directory_block *)addr;
+    return LE_Read16(block->prev) == 0 &&
+           block->key.header.storage_type_and_name_length >> 4 == storage_type_volume_block;
+}
+
+const directory_block *
+context_t::_GetVolumeDirectoryBlock()
 {
     const void *                block   = _disk.ReadBlock(2);
-    const directory_block_t *   dir_blk = nullptr;
 
-    dir_blk = directory_block_t::Create(block);
-    if (dir_blk) {
-        return dir_blk;
+    if (L_IsVolumeDirectoryBlock(block)) {
+        return (directory_block *)block;
     }
 
     char tmp_blk[BLOCK_SIZE];
     L_Deobfuscate(block, tmp_blk);
 
-    dir_blk = directory_block_t::Create(tmp_blk);
-    if (dir_blk) {
+    if (L_IsVolumeDirectoryBlock(tmp_blk)) {
         LOG(LOG_INFO, "deobfuscated protected disk");
         _disk.WriteBlock(2, tmp_blk);
-        return dir_blk;
+        return (directory_block *)_disk.ReadBlock(2);
     }
 
-    dir_blk = directory_block_t::Create(_disk.ReadTrackSector(0, 11));
-    if (dir_blk) {
+    block = _disk.ReadTrackSector(0, 11);
+    if (L_IsVolumeDirectoryBlock(block)) {
         LOG(LOG_INFO, "converting track-and-sector disk to block disk");
         _disk.Convert(disk_t::RWTS_TO_BLOCK);
-        return directory_block_t::Create(_disk.ReadBlock(2));
+        return (directory_block *)_disk.ReadBlock(2);
     }
 
     return nullptr;
+}
+
+std::string
+context_t::GetVolumeName() const
+{
+    auto volume = volume_header_t::Create(&_root->key.header);
+    return volume->FileName();
+}
+
+static strings_t
+L_SplitPath(const std::string & pathname)
+{
+    strings_t path;
+
+    size_t start = pathname[0] == '/' ? 1 : 0;
+    size_t pos = 0;
+    while ((pos = pathname.find('/', start)) != std::string::npos) {
+        path.push_back(pathname.substr(start, pos - 1));
+        start = pos + 1;
+    }
+    path.push_back(pathname.substr(start));
+
+    return path;
+}
+
+const entry_t *
+context_t::GetEntry(const std::string & pathname) const
+{
+    if (pathname == "/") {
+        return (entry_t *)&_root->key.header;
+    }
+
+    auto path = L_SplitPath(pathname);
+    auto itr = path.begin();
+    auto handle = new directory_handle_t(this, _root);
+    auto entry = handle->NextEntry();
+
+    std::unique_ptr<directory_handle_t> defer_cleanup(handle);
+
+    while (entry != nullptr && itr != path.end()) {
+        if (entry->IsNamed(*itr)) {
+            if (++itr == path.end()) {
+                return entry;
+            }
+            else if (entry->IsDirectory() == false) {
+                error = err_directory_not_found;
+                return nullptr;
+            }
+
+            auto key_pointer = entry->KeyPointer();
+            auto key_block = (directory_block *)_disk.ReadBlock(key_pointer);
+            handle->Open(key_block);
+        }
+
+        entry = handle->NextEntry();
+    }
+
+    error = err_file_not_found;
+
+    return nullptr;
+}
+
+file_handle_t *
+context_t::OpenFile(const std::string & pathname) const
+{
+    throw std::logic_error(std::string("UNIMPLEMENTED: ") + __PRETTY_FUNCTION__);
+}
+
+directory_handle_t *
+context_t::OpenDirectory(const std::string & pathname) const
+{
+    if (pathname == "/") {
+        return new directory_handle_t(this, _root);
+    }
+
+//    auto entry = GetEntry(pathname);
+//    if (entry == nullptr) {
+//        return nullptr;
+//    }
+//
+//    if (entry->IsDirectory() == false) {
+//        error = err_directory_not_found;
+//        return nullptr;
+//    }
+//
+//    auto dirent = (directory_header_t *)entry;
+//    auto key_block = (directory_block *)_disk.ReadBlock(dirent->)
+//    auto handle = new directory_handle_t(this, _root);
+
+    throw std::logic_error(std::string("UNIMPLEMENTED: ") + __FUNCTION__);
+}
+
+const void *
+context_t::GetBlock(int index) const
+{
+    static uint8_t sparse_block[BLOCK_SIZE] = {};
+    return index ? _disk.ReadBlock(index) : sparse_block;
+}
+
+int
+context_t::GetBlocksUsed(const entry_t *entry) const
+{
+    if (entry->IsFile() || entry->IsDirectory()) {
+        auto file = (const directory_entry_t *)entry;
+        return file->BlocksUsed();
+    }
+
+    if (entry->IsHeader()) {
+
+    }
+
+    throw std::runtime_error("expected storage type");
+}
+
+int
+context_t::CountVolumeBlocksUsed() const
+{
+    throw UNIMPLEMENTED;
+}
+
+int
+context_t::CountVolumeDirectoryBlocks() const
+{
+    int num_blocks = 1;
+
+    const directory_block * block = _root;
+    uint16_t pointer = LE_Read16(block->next);
+    while (pointer != 0) {
+        num_blocks++;
+        block = (const directory_block *)_disk.ReadBlock(pointer);
+        pointer = LE_Read16(block->next);
+    }
+
+    return num_blocks;
 }
 
 } // namespace

@@ -59,7 +59,7 @@ inline uint32_t LE_Read24(const uint8_t *p)
     return *(p + 2) << 16 | *(p + 1) << 8 | *(p + 0);
 }
 
-void DumpBlock(const void *ptr);
+[[maybe_unused]] void DumpBlock(const void *ptr);
 
 } // namespace
 

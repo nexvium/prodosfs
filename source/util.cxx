@@ -13,14 +13,16 @@
 namespace prodos
 {
 
-Logger LOG = nullptr;
+static void LogNothing(int level, const char *format, ...) { }
 
-void SetLogger(prodos::Logger func)
+Logger LOG = LogNothing;
+
+void SetLogger(Logger func)
 {
     LOG = func;
 }
 
-void DumpBlock(const void *ptr)
+[[maybe_unused]] void DumpBlock(const void *ptr)
 {
     auto addr = (const char *)ptr;
     char buffer[128] = {};

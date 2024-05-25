@@ -42,7 +42,7 @@ public:
     bool            IsInactive()                        const;
     bool            IsRoot()                            const;
 
-    bool            IsNamed(const std::string & name)   const;
+    bool            NameMatches(const std::string & name)   const;
 };
 
 class directory_entry_t : public entry_t

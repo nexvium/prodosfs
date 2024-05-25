@@ -131,7 +131,7 @@ entry_t::IsRoot() const
 }
 
 bool
-entry_t::IsNamed(const std::string & name) const
+entry_t::NameMatches(const std::string & name) const
 {
     return strcasecmp(name.c_str(), FileName().c_str()) == 0;
 }
@@ -200,14 +200,6 @@ directory_header_t::Create(const directory_header *header)
     return (const directory_header_t *)header;
 }
 
-//uint16_t
-//directory_header_t::BlocksUsed() const
-//{
-//    auto entry = (const directory_header *)this;
-//    // TODO get the actual number of blocks used from the parent entry
-//    return 2;
-//}
-
 //================================================================================================
 // volume_header_t
 //------------------------------------------------------------------------------------------------
@@ -250,19 +242,6 @@ volume_header_t::TotalBlocks() const
     auto entry = (const directory_header *)this;
     return LE_Read16(entry->total_blocks);
 }
-
-//uint16_t
-//volume_header_t::BlocksUsed() const
-//{
-//    auto entry = (const directory_header *)this;
-//
-//    auto pointer = LE_Read16(entry->total_blocks);
-//    while (pointer != 0) {
-//        _
-//    }
-//
-//    return LE_Read16(entry->total_blocks);
-//}
 
 } // namespace
 

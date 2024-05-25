@@ -199,7 +199,7 @@ context_t::GetEntry(const std::string & pathname) const
     std::unique_ptr<directory_handle_t> defer_cleanup(handle);
 
     while (entry != nullptr && itr != path.end()) {
-        if (entry->IsNamed(*itr)) {
+        if (entry->NameMatches(*itr)) {
             if (++itr == path.end()) {
                 return entry;
             }
@@ -224,7 +224,16 @@ context_t::GetEntry(const std::string & pathname) const
 file_handle_t *
 context_t::OpenFile(const std::string & pathname) const
 {
-    throw std::logic_error(std::string("UNIMPLEMENTED: ") + __PRETTY_FUNCTION__);
+    auto entry = GetEntry(pathname);
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    else if (entry->IsFile() == false) {
+        error = err_unsupported_storage_type;
+        return nullptr;
+    }
+
+    return new file_handle_t(this, (const directory_entry_t *)entry);
 }
 
 directory_handle_t *
@@ -234,21 +243,21 @@ context_t::OpenDirectory(const std::string & pathname) const
         return new directory_handle_t(this, _root);
     }
 
-//    auto entry = GetEntry(pathname);
-//    if (entry == nullptr) {
-//        return nullptr;
-//    }
-//
-//    if (entry->IsDirectory() == false) {
-//        error = err_directory_not_found;
-//        return nullptr;
-//    }
-//
-//    auto dirent = (directory_header_t *)entry;
-//    auto key_block = (directory_block *)_disk.ReadBlock(dirent->)
-//    auto handle = new directory_handle_t(this, _root);
+    auto entry = GetEntry(pathname);
+    if (entry == nullptr) {
+        return nullptr;
+    }
 
-    throw std::logic_error(std::string("UNIMPLEMENTED: ") + __FUNCTION__);
+    if (entry->IsDirectory() == false) {
+        error = err_directory_not_found;
+        return nullptr;
+    }
+
+    auto dirent = (const directory_entry_t *)entry;
+    auto pointer = dirent->KeyPointer();
+    auto key_block = (const directory_block *)_disk.ReadBlock(pointer);
+
+    return new directory_handle_t(this, key_block);
 }
 
 const void *

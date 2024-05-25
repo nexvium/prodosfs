@@ -14,6 +14,8 @@
 namespace prodos
 {
 
+extern thread_local err_t error;
+
 directory_handle_t::directory_handle_t(const context_t * context, const directory_block * key_block)
     : _context(context), _header(nullptr), _block(nullptr), _block_index(1), _entry_index(0)
 {
@@ -39,29 +41,31 @@ directory_handle_t::NextEntry()
 {
     auto file_count = LE_Read16(_header->file_count);
     if (_entry_index == file_count) {
+        error = err_end_of_file;
         return nullptr;
     }
 
-    auto entry = (directory_entry_t *)&_block->any.entry[_block_index];
+    auto entry = (const directory_entry_t *)&_block->any.entry[_block_index];
     _entry_index++;
-    if (_entry_index == file_count) {
-        return nullptr;
-    }
 
-    do {
-        if (_block_index < ENTRIES_PER_BLOCK) {
-            _block_index++;
-        }
-        else {
-            auto next_block = LE_Read16(_block->next);
-            if (next_block == 0 && _entry_index != file_count) {
-                throw std::runtime_error("no more directory blocks");
+    if (_entry_index < file_count) {
+        const directory_entry_t * next_entry = nullptr;
+        do {
+            if (_block_index < _header->entries_per_block) {
+                _block_index++;
             }
+            else {
+                auto next_block = LE_Read16(_block->next);
+                if (next_block == 0) {
+                    throw std::runtime_error("no more directory blocks");
+                }
 
-            _block = (directory_block *)_context->GetBlock(next_block);
-            _block_index = 0;
-        }
-    } while (_block->any.entry[_block_index].storage_type_and_name_length >> 4 == 0);
+                _block = (const directory_block *)_context->GetBlock(next_block);
+                _block_index = 0;
+            }
+            next_entry = (directory_entry_t *)&_block->any.entry[_block_index];
+        } while (next_entry->IsInactive());
+    }
 
     return entry;
 }

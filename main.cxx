@@ -18,12 +18,20 @@
 
 using namespace prodos;
 
-const char *    disk_image = nullptr;
-const int       log_level = LOG_MAX;
+static const char *    disk_image = nullptr;
+static const int       log_level = LOG_MAX;
 
-context_t *     context = nullptr;
+static context_t *     context = nullptr;
 
-void LogMessage(int level, const char *format, ...)
+enum text_mode_t
+{
+    text_mode_prodos,
+    text_mode_unix
+};
+
+static text_mode_t text_mode = text_mode_unix;
+
+static void LogMessage(int level, const char *format, ...)
 {
     if (level <= log_level) {
         va_list ap;
@@ -35,7 +43,7 @@ void LogMessage(int level, const char *format, ...)
     }
 }
 
-int ToErrno(err_t err)
+static int ToErrno(err_t err)
 {
     static std::unordered_map<err_t, int> errors = {
             { err_none,                     0       },
@@ -79,7 +87,7 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
-        return -ToErrno(context->Error());
+        return -ToErrno(context_t::Error());
     }
 
     st->st_nlink = 1;
@@ -120,7 +128,7 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 
     auto fh = context->OpenFile(path);
     if (fh == nullptr) {
-        return -ToErrno(context->Error());
+        return -ToErrno(context_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(fh);
@@ -130,17 +138,27 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 
 static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, struct fuse_file_info * fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %z, %p)", path, off, fi);
+    LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %zd, %p)", path, off, fi);
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     auto pos = fh->Seek(off, SEEK_SET);
     if (pos < 0) {
-        return -ToErrno(context->Error());
+        return -ToErrno(context_t::Error());
     }
 
     size_t n = fh->Read(buf, bufsiz);
     if (n == 0 && fh->Eof() == false) {
-        return -ToErrno(context->Error());
+        return -ToErrno(context_t::Error());
+    }
+
+    if (text_mode == text_mode_unix && fh->Type() == file_type_text) {
+        auto text = (char *)buf;
+        for (int i = 0; i < n; i++) {
+            text[i] &= 0x7f;
+            if (text[i] == '\r') {
+                text[i] = '\n';
+            }
+        }
     }
 
     return (int)n;
@@ -190,7 +208,7 @@ static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 
     LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
 
-    return nullptr;
+    return context;
 }
 
 static void prodosfs_destroy(void *private_data)
@@ -210,7 +228,7 @@ static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
 
     auto dh = context->OpenDirectory(path);
     if (dh == nullptr) {
-        return -ToErrno(context->Error());
+        return -ToErrno(context_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(dh);
@@ -239,8 +257,8 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         }
     }
 
-    if (context->Error()) {
-        return -ToErrno(context->Error());
+    if (context_t::Error() != err_end_of_file) {
+        return -ToErrno(context_t::Error());
     }
 
     return 0;

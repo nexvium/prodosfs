@@ -25,9 +25,6 @@ public:
     const directory_entry_t *    NextEntry();
 
 private:
-    directory_handle_t(const context_t * context, const directory_block * key_block);
-    void                    Open(const directory_block * key_block);
-
     const context_t *           _context;
     const directory_header *    _header;
     const directory_block *     _block;
@@ -35,6 +32,10 @@ private:
     int                         _entry_index;
 
     friend class context_t;
+
+    directory_handle_t(const context_t * context, const directory_block * key_block);
+
+    void    Open(const directory_block * key_block);
 };
 
 } // namespace

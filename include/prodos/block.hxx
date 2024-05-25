@@ -56,7 +56,7 @@ struct directory_header
 };
 
 /*
-** A file entry describes a file or subdirectory in the current directory.
+** A directory entry describes a file or subdirectory in the current directory.
 */
 struct directory_entry
 {
@@ -97,6 +97,18 @@ struct directory_block
         } any;
     };
     uint8_t                     unused;
+};
+
+/*
+** An index block contains 16-bit pointers (block numbers) to 256 other blocks.  The pointers are
+** split into two arrays of low- and high-order bytes because the 6502 CPU is an 8-bit processor,
+** so an index register can only have a value of 0-255.  The 16-bit pointer for the i-th block can
+** then be assembled by combining lo[i] and hi[i].
+*/
+struct index_block
+{
+    uint8_t lo[256];
+    uint8_t hi[256];
 };
 
 } // namespace

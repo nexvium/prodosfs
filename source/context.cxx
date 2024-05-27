@@ -1,5 +1,5 @@
 /*
-** prodosfs - A read-only ProDOS 8 implementation as a FUSE filesystem.
+** prodosfs - A mountable read-only filesystem for Apple II ProDOS 8 disk images.
 **
 ** Copyright 2024 by Javier Alvarado.
 */

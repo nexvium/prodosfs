@@ -27,7 +27,6 @@ add_executable(
     include/prodos/entry.hxx
     include/prodos/file.hxx
     include/prodos/util.hxx
-    source/block.cxx
     source/context.cxx
     source/directory.cxx
     source/disk.cxx

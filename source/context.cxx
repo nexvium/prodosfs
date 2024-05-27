@@ -25,8 +25,16 @@ typedef std::vector<std::string>    strings_t;
 
 thread_local err_t error = err_none;
 
+static bool
+S_IsVolumeDirectoryBlock(const void *addr)
+{
+    auto block = (const directory_block *)addr;
+    return LE_Read16(block->prev) == 0 &&
+           block->key.header.storage_type_and_name_length >> 4 == storage_type_volume_block;
+}
+
 static void
-L_Deobfuscate(const void *src_blk, void * dst_blk)
+S_Deobfuscate(const void *src_blk, void * dst_blk)
 {
     char *  pw_file = getenv("PRODOSFS_PASSWORD_FILE");
     if (pw_file == nullptr) {
@@ -89,11 +97,11 @@ L_Deobfuscate(const void *src_blk, void * dst_blk)
         }
     }
 
-    if (plain[0] != 0 || plain[1] != 0 || (plain[4] >> 4 != storage_type_volume_block)) {
-        LOG(LOG_DEBUG1, "disk is not protected with password");
+    if (S_IsVolumeDirectoryBlock(plain)) {
+        return;
     }
 
-    return;
+    LOG(LOG_DEBUG1, "disk is not protected with password");
 }
 
 context_t::context_t(const std::string & pathname)
@@ -125,34 +133,26 @@ context_t::Error()
     return error;
 }
 
-static bool
-L_IsVolumeDirectoryBlock(const void *addr)
-{
-    auto block = (const directory_block *)addr;
-    return LE_Read16(block->prev) == 0 &&
-           block->key.header.storage_type_and_name_length >> 4 == storage_type_volume_block;
-}
-
 const directory_block *
 context_t::_GetVolumeDirectoryBlock()
 {
-    const void *                block   = _disk.ReadBlock(2);
+    const void *    block   = _disk.ReadBlock(2);
 
-    if (L_IsVolumeDirectoryBlock(block)) {
+    if (S_IsVolumeDirectoryBlock(block)) {
         return (directory_block *)block;
     }
 
     char tmp_blk[BLOCK_SIZE];
-    L_Deobfuscate(block, tmp_blk);
+    S_Deobfuscate(block, tmp_blk);
 
-    if (L_IsVolumeDirectoryBlock(tmp_blk)) {
+    if (S_IsVolumeDirectoryBlock(tmp_blk)) {
         LOG(LOG_INFO, "deobfuscated protected disk");
         _disk.WriteBlock(2, tmp_blk);
         return (directory_block *)_disk.ReadBlock(2);
     }
 
     block = _disk.ReadTrackSector(0, 11);
-    if (L_IsVolumeDirectoryBlock(block)) {
+    if (S_IsVolumeDirectoryBlock(block)) {
         LOG(LOG_INFO, "converting track-and-sector disk to block disk");
         _disk.Convert(disk_t::RWTS_TO_BLOCK);
         return (directory_block *)_disk.ReadBlock(2);
@@ -169,7 +169,7 @@ context_t::GetVolumeName() const
 }
 
 static strings_t
-L_SplitPath(const std::string & pathname)
+S_SplitPath(const std::string & pathname)
 {
     strings_t path;
 
@@ -191,7 +191,7 @@ context_t::GetEntry(const std::string & pathname) const
         return (entry_t *)&_root->key.header;
     }
 
-    auto path = L_SplitPath(pathname);
+    auto path = S_SplitPath(pathname);
     auto itr = path.begin();
     auto handle = new directory_handle_t(this, _root);
     auto entry = handle->NextEntry();

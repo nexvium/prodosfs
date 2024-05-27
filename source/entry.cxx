@@ -15,7 +15,7 @@
 
 using namespace prodos;
 
-static void L_DecodeTimestamp(const uint8_t * ptr, timestamp_t * timestamp)
+static void S_DecodeTimestamp(const uint8_t * ptr, timestamp_t * timestamp)
 {
     auto date = LE_Read16(ptr);
     timestamp->day   = (date & 0b00000000'00011111) >> 0;
@@ -60,7 +60,7 @@ entry_t::CreationTimestamp() const
     auto entry = (const directory_entry *)this;
 
     timestamp_t timestamp = {};
-    L_DecodeTimestamp(entry->creation_date_time, &timestamp);
+    S_DecodeTimestamp(entry->creation_date_time, &timestamp);
 
     return timestamp;
 }
@@ -181,7 +181,7 @@ directory_entry_t::LastModTimestamp() const
     auto entry = (const directory_entry *)this;
 
     timestamp_t timestamp = {};
-    L_DecodeTimestamp(entry->last_mod, &timestamp);
+    S_DecodeTimestamp(entry->last_mod, &timestamp);
 
     return timestamp;
 }

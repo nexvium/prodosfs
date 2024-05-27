@@ -63,7 +63,7 @@ static int ToErrno(err_t err)
     return itr->second;
 }
 
-static time_t L_ToUnixTime(const timestamp_t & timestamp)
+static time_t S_ToUnixTime(const timestamp_t & timestamp)
 {
     struct tm tm = {};
 
@@ -98,7 +98,7 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
 
     // POSIX has no notion of "file creation time" and ProDOS has no notion of
     // "inode change time", so report the creation time as the change time.
-    st->st_ctim.tv_sec = L_ToUnixTime(entry->CreationTimestamp());
+    st->st_ctim.tv_sec = S_ToUnixTime(entry->CreationTimestamp());
 
     if (entry->IsRoot()) {
         st->st_blocks = context->CountVolumeDirectoryBlocks();
@@ -106,14 +106,14 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
         st->st_mode |= S_IFDIR | S_IXUSR | S_IXGRP;
 
         // ProDOS does not track modification time, so use creation time.
-        st->st_mtim.tv_sec = L_ToUnixTime(entry->CreationTimestamp());
+        st->st_mtim.tv_sec = S_ToUnixTime(entry->CreationTimestamp());
     }
     else if (entry->IsFile() || entry->IsDirectory()) {
         auto file = (directory_entry_t *)entry;
         st->st_blocks = file->BlocksUsed();
         st->st_size = file->Eof();
         st->st_mode |= entry->IsFile() ? S_IFREG : S_IFDIR | S_IXUSR | S_IXGRP;
-        st->st_mtim.tv_sec = L_ToUnixTime(file->LastModTimestamp());
+        st->st_mtim.tv_sec = S_ToUnixTime(file->LastModTimestamp());
     }
     else {
         throw std::runtime_error("unexpected storage type");

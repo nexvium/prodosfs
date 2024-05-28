@@ -23,6 +23,8 @@ struct timestamp_t
     int     day;
     int     hour;
     int     minute;
+
+    std::string AsString() const;
 };
 
 class entry_t

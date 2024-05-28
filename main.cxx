@@ -6,15 +6,16 @@
 
 #define FUSE_USE_VERSION 30
 
+#include "prodos.hxx"
+
 #include <stdexcept>
 #include <unordered_map>
 
 #include <fuse.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
-
-#include "prodos.hxx"
 
 using namespace prodos;
 
@@ -22,6 +23,8 @@ static const char *    disk_image = nullptr;
 static const int       log_level = LOG_MAX;
 
 static context_t *     context = nullptr;
+
+typedef std::unordered_map<std::string, std::string>    attributes_t;
 
 enum text_mode_t
 {
@@ -75,6 +78,24 @@ static time_t S_ToUnixTime(const timestamp_t & timestamp)
                                      : timestamp.year;
 
     return mktime(&tm);
+}
+
+inline std::string XATTR(const char *name)
+{
+    return std::string("prodos.") + name;
+}
+
+static attributes_t S_GetAttributes(const entry_t * entry)
+{
+    attributes_t    attributes;
+
+    /*
+    ** Set attributes that apply to all files.
+    */
+
+    attributes[XATTR("creation_timestamp")] = entry->CreationTimestamp().AsString();
+
+    return attributes;
 }
 
 /*=================================================================================================
@@ -179,18 +200,43 @@ static int prodosfs_getxattr(const char *path, const char *name, char *value, si
 {
     LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p)", path, name, value);
 
-    // TODO
+    auto entry = context->GetEntry(path);
+    if (entry == nullptr) {
+        return -ToErrno(context_t::Error());
+    }
 
-    return 0;
+    int length = 0;
+    auto attributes = S_GetAttributes(entry);
+    auto itr = attributes.find(name);
+    if (itr != attributes.end()) {
+        if (value) {
+            strcpy(value, itr->second.c_str());
+        }
+        length += itr->second.length();
+    }
+
+    return length;
 }
 
-static int prodosfs_listxattr(const char *path, char *buf, size_t size)
+static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\",  %p)", path, buf);
+    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\",  %p)", path, buffer);
 
-    // TODO
+    auto entry = context->GetEntry(path);
+    if (entry == nullptr) {
+        return -ToErrno(context_t::Error());
+    }
 
-    return 0;
+    int length = 0;
+    auto attributes = S_GetAttributes(entry);
+    for (auto attr : attributes) {
+        if (buffer) {
+            snprintf(buffer + length, size - length, "%s", attr.first.c_str());
+        }
+        length += attr.first.length() + 1;
+    }
+
+    return length;
 }
 
 static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)

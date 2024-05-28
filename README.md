@@ -8,7 +8,7 @@ prodosfs is a [FUSE](https://github.com/libfuse/libfuse) filesystem that allows 
 
 ## Limitations
 
-This sofware was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
+This software was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
 
 Since it is intended mainly for personal use on small disks, there has been no effort spent on performance or security.
 

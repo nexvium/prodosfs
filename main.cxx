@@ -80,6 +80,33 @@ static time_t S_ToUnixTime(const timestamp_t & timestamp)
     return mktime(&tm);
 }
 
+static std::string S_AccessToString(uint8_t access)
+{
+    std::string str;
+
+    if (AXS_READ(access)) {
+        str += "READ ";
+    }
+    if (AXS_WRITE(access)) {
+        str += "WRITE ";
+    }
+    if (AXS_BACKUP(access)) {
+        str += "BACKUP ";
+    }
+    if (AXS_RENAME(access)) {
+        str += "RENAME ";
+    }
+    if (AXS_DESTROY(access)) {
+        str += "DESTROY ";
+    }
+
+    if (str.length() > 0) {
+        str.resize(str.length() - 1);
+    }
+
+    return str;
+}
+
 inline std::string XATTR(const char *name)
 {
     return std::string("prodos.") + name;
@@ -89,11 +116,29 @@ static attributes_t S_GetAttributes(const entry_t * entry)
 {
     attributes_t    attributes;
 
-    /*
-    ** Set attributes that apply to all files.
-    */
-
     attributes[XATTR("creation_timestamp")] = entry->CreationTimestamp().AsString();
+    attributes[XATTR("version")] = std::to_string(entry->Version());
+    attributes[XATTR("min_version")] = std::to_string(entry->MinVersion());
+    attributes[XATTR("access")] = S_AccessToString(entry->Access());
+
+    if (entry->IsFile() || entry->IsDirectory()) {
+        auto dirent = (const directory_entry_t *)entry;
+        auto info = GetFileTypeInfo(dirent->FileType());
+
+        attributes[XATTR("file_type")] = info->type;
+        attributes[XATTR("file_type_name")] = info->name;
+        attributes[XATTR("file_type_description")] = info->description;
+    }
+    else if (entry->IsRoot()) {
+        auto volume = (const volume_header_t *)entry;
+        attributes[XATTR("volume_name")] = volume->FileName();
+        attributes[XATTR("file_count")] = std::to_string(volume->FileCount());
+        attributes[XATTR("total_blocks")] = std::to_string(volume->TotalBlocks());
+        attributes[XATTR("used_blocks")] = std::to_string(context->CountVolumeBlocksUsed());
+    }
+    else {
+        throw std::runtime_error("unexpected file type");
+    }
 
     return attributes;
 }

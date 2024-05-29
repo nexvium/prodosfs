@@ -26,11 +26,13 @@ add_executable(
     include/prodos/disk.hxx
     include/prodos/entry.hxx
     include/prodos/file.hxx
+    include/prodos/filetype.hxx
     include/prodos/util.hxx
     source/context.cxx
     source/directory.cxx
     source/disk.cxx
     source/entry.cxx
     source/file.cxx
+    source/filetype.cxx
     source/util.cxx
 )

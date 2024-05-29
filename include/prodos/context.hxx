@@ -64,6 +64,7 @@ enum file_type_t
     file_type_prodos_system     = 0xFF,
 };
 
+
 class context_t
 {
 public:
@@ -84,12 +85,13 @@ public:
 
     file_handle_t *         OpenFile(const std::string & pathname) const;
 
-    static err_t            Error();
     const void *            GetBlock(int index) const;
     int                     GetBlocksUsed(const entry_t * entry) const;
 
     int                     CountVolumeBlocksUsed()         const;
     int                     CountVolumeDirectoryBlocks()    const;
+
+    static err_t            Error();
 
 private:
     disk_t                      _disk;

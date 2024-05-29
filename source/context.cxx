@@ -285,7 +285,19 @@ context_t::GetBlocksUsed(const entry_t *entry) const
 int
 context_t::CountVolumeBlocksUsed() const
 {
-    throw UNIMPLEMENTED;
+    uint16_t pointer = LE_Read16(_root->key.header.bit_map_pointer);
+    auto blocks = _disk.NumBlocks();
+    auto used = 0;
+
+    while (blocks > 0) {
+        auto bitmap = (const uint8_t *)_disk.ReadBlock(pointer++);
+        for (auto i = 0; i < BLOCK_SIZE && blocks > 0; i++) {
+            used += sizeof(uint8_t) - __builtin_popcount(bitmap[i]);
+            blocks -= sizeof(uint8_t);
+        }
+    }
+
+    return used;
 }
 
 int

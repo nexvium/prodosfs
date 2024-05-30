@@ -50,20 +50,6 @@ enum storage_type_t
     storage_type_volume_block   = 0xF,
 };
 
-enum file_type_t
-{
-    file_type_none              = 0x00,
-    file_type_text              = 0x04,
-    file_type_binary            = 0x06,
-    file_type_directory         = 0x0F,
-    file_type_appleworks_db     = 0x19,
-    file_type_appleworks_wp     = 0x20,
-    file_type_appleworks_ss     = 0x21,
-    file_type_integer_basic     = 0xFA,
-    file_type_applesoft_basic   = 0xFC,
-    file_type_prodos_system     = 0xFF,
-};
-
 
 class context_t
 {

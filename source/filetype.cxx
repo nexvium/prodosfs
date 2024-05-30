@@ -13,6 +13,25 @@
 namespace prodos
 {
 
+typedef std::unordered_map<uint8_t, const file_type_info_t>  file_type_table_t;
+
+// Forward declaration for internal table so that it can be
+// referenced before it is defined, since it is long.
+namespace {  extern file_type_table_t  file_type_table; }
+
+const file_type_info_t *
+GetFileTypeInfo(uint8_t type)
+{
+    return &file_type_table[type];
+}
+
+bool IsAppleWorksFile(uint8_t type)
+{
+    return type == file_type_appleworks_wp
+        || type == file_type_appleworks_ss
+        || type == file_type_appleworks_db;
+}
+
 static file_type_info_t
 S_CreateFileTypeInfo(uint8_t type, const char * name = nullptr, const char * description = nullptr)
 {
@@ -34,7 +53,12 @@ S_CreateFileTypeInfo(uint8_t type, const char * name = nullptr, const char * des
     return file_type_info_t{type_buffer, name, description};
 }
 
-typedef std::unordered_map<uint8_t, const file_type_info_t>  file_type_table_t;
+
+namespace
+{
+
+// Define the constant file type table last so that it is out of the way of
+// the functions that use it.
 
 #define ADD_FILE_TYPE(code,type,desc)   { code, S_CreateFileTypeInfo(code, type, desc) }
 file_type_table_t  file_type_table =
@@ -297,12 +321,8 @@ file_type_table_t  file_type_table =
     ADD_FILE_TYPE(0xFF,  "SYS",     "System file"),
 };
 
-const file_type_info_t *
-GetFileTypeInfo(uint8_t type)
-{
-    return &file_type_table[type];
-}
+} // anonymous namespace
 
-}; // namespace
+} // prodos namespace
 
 // eof

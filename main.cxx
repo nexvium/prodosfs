@@ -107,6 +107,30 @@ static std::string S_AccessToString(uint8_t access)
     return str;
 }
 
+static std::string S_AuxTypeToString(uint16_t aux_type)
+{
+    char buffer[16] = {};
+    sprintf(buffer, "$%04X", aux_type);
+    return std::string(buffer);
+}
+
+static std::string S_AppleWorksFileName(const std::string & filename, uint16_t aux_type)
+{
+    char buffer[16] = {};
+
+    auto mask = ((aux_type & 0x00FF) << 8) | ((aux_type & 0xFF00) >> 8);
+    for (auto i = 0; i < filename.length(); i++) {
+        if (mask & 1 << (15 - i)) {
+            buffer[i] = filename[i] == '.' ? ' ' : tolower(filename[i]);
+        }
+        else {
+            buffer[i] = filename[i];
+        }
+    }
+
+    return std::string(buffer);
+}
+
 inline std::string XATTR(const char *name)
 {
     return std::string("prodos.") + name;
@@ -117,17 +141,26 @@ static attributes_t S_GetAttributes(const entry_t * entry)
     attributes_t    attributes;
 
     attributes[XATTR("creation_timestamp")] = entry->CreationTimestamp().AsString();
+    attributes[XATTR("access")] = S_AccessToString(entry->Access());
+
+    // TODO need to find a version-number to ProDOS-version map
     attributes[XATTR("version")] = std::to_string(entry->Version());
     attributes[XATTR("min_version")] = std::to_string(entry->MinVersion());
-    attributes[XATTR("access")] = S_AccessToString(entry->Access());
 
     if (entry->IsFile() || entry->IsDirectory()) {
         auto dirent = (const directory_entry_t *)entry;
-        auto info = GetFileTypeInfo(dirent->FileType());
 
+        auto info = GetFileTypeInfo(dirent->FileType());
         attributes[XATTR("file_type")] = info->type;
         attributes[XATTR("file_type_name")] = info->name;
         attributes[XATTR("file_type_description")] = info->description;
+
+        attributes[XATTR("aux_type")] = S_AuxTypeToString(dirent->AuxType());
+
+        if (IsAppleWorksFile(dirent->FileType())) {
+            auto name = S_AppleWorksFileName(dirent->FileName(), dirent->AuxType());
+            attributes[XATTR("appleworks_filename")] = name;
+        }
     }
     else if (entry->IsRoot()) {
         auto volume = (const volume_header_t *)entry;
@@ -265,7 +298,7 @@ static int prodosfs_getxattr(const char *path, const char *name, char *value, si
 
 static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\",  %p)", path, buffer);
+    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p)", path, buffer);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {

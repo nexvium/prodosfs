@@ -1,0 +1,98 @@
+#!/usr/bin/perl
+#
+# AppleWorks-to-Text translator.
+# https://prodos8.com/docs/technote/ftn/1a/
+#
+use strict;
+use warnings;
+use Getopt::Long;
+
+$0 = (split m#/#, $0)[-1];
+
+my $WIDTH = $ENV{COLUMNS} || 120;
+my %OPT = ();
+
+GetOptions(\%OPT, "help|h", "width=i", "plain!") or exit(1);
+if ($OPT{help}) {
+    print <<USAGE ;
+usage:  $0 [opts] < <file>
+
+options:
+
+    -h --help           print usage message
+    -w --width          specify "page" width instead of using term width
+       --[no-]plain     preserve (or not) bold, underline, etc
+USAGE
+}
+
+if ($OPT{width}) {
+    $WIDTH = $OPT{width};
+}
+
+my $justification = 'UNJUSTIFY';
+my $buffer = undef;
+my $indent = "";
+my $n = sysread(STDIN, $buffer, 300);
+while (sysread(STDIN, $buffer, 2) == 2) {
+    my ($arg, $cmd) =  unpack "CC", $buffer;
+    if ($cmd == 0xFF and $arg = 0xFF) {
+        # end of document
+        last;
+    }
+    elsif ($cmd == 0x00) {
+        $n = sysread(STDIN, $buffer, $arg);
+        my ($b2, $b3) = unpack "CC", $buffer;
+        my $line = substr($buffer, 2);
+
+        if ($justification eq 'CENTER') {
+            print " " x ( ($WIDTH - length($line)) / 2 );
+        }
+        elsif ($justification eq 'JUSTIFY') {
+            die "can't handle justify command yet\n";
+        }
+        else {
+            print $indent;
+        }
+
+        if (($b2 & 0x7f) == $b2 && $justification eq 'UNJUSTIFY') {
+            print " " x $b2;
+        }
+
+        if (-t STDOUT || (defined $OPT{plain} && $OPT{plain} == 0)) {
+            $line =~ s/\x01/\e[1m/g;
+            $line =~ s/\x02/\e[22m/g;
+            $line =~ s/\x07/\e[4m/g;
+            $line =~ s/\x08/\e[24m/g;
+        }
+        else {
+            $line =~ s/[\x01-\x18]//g;
+        }
+
+        print "$line";
+        if ($b3 & 0x80) {
+            print "\n";
+        }
+    }
+    elsif ($cmd == 0xD9) {
+        if ($arg > 0) {
+            $indent = " " x $arg;
+        }
+        elsif ($ENV{COLUMNS} > 80) {
+            $indent = " " x (($ENV{COLUMNS} - 80) / 2);
+        }
+    }
+    elsif ($cmd == 0xDE) {
+        die "can't handle indent command yet\n";
+    }
+    elsif ($cmd == 0xDF) {
+        $justification = 'JUSTIFY';
+    }
+    elsif ($cmd == 0xE0) {
+        $justification = 'NONE';
+    }
+    elsif ($cmd == 0xE1) {
+        $justification = 'CENTER';
+    }
+}
+
+# eof

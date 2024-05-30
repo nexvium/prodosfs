@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 #include <fuse.h>
 #include <stdlib.h>
@@ -82,26 +83,18 @@ static time_t S_ToUnixTime(const timestamp_t & timestamp)
 
 static std::string S_AccessToString(uint8_t access)
 {
+    std::vector<std::string>    allowed;
+    if (AXS_READ(access))       allowed.emplace_back("READ");
+    if (AXS_WRITE(access))      allowed.emplace_back("WRITE");
+    if (AXS_BACKUP(access))     allowed.emplace_back("BACKUP");
+    if (AXS_RENAME(access))     allowed.emplace_back("RENAME");
+    if (AXS_DESTROY(access))    allowed.emplace_back("DESTROY");
+
+    // Would be nice if the STL provided a join function.
     std::string str;
-
-    if (AXS_READ(access)) {
-        str += "READ ";
-    }
-    if (AXS_WRITE(access)) {
-        str += "WRITE ";
-    }
-    if (AXS_BACKUP(access)) {
-        str += "BACKUP ";
-    }
-    if (AXS_RENAME(access)) {
-        str += "RENAME ";
-    }
-    if (AXS_DESTROY(access)) {
-        str += "DESTROY ";
-    }
-
-    if (str.length() > 0) {
-        str.resize(str.length() - 1);
+    for (const auto & flag : allowed) {
+        if (!str.empty())   str += " | ";
+        str += flag;
     }
 
     return str;
@@ -111,7 +104,7 @@ static std::string S_AuxTypeToString(uint16_t aux_type)
 {
     char buffer[16] = {};
     sprintf(buffer, "$%04X", aux_type);
-    return std::string(buffer);
+    return { buffer };
 }
 
 static std::string S_AppleWorksFileName(const std::string & filename, uint16_t aux_type)
@@ -128,7 +121,7 @@ static std::string S_AppleWorksFileName(const std::string & filename, uint16_t a
         }
     }
 
-    return std::string(buffer);
+    return { buffer };
 }
 
 inline std::string XATTR(const char *name)

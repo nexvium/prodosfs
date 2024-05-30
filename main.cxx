@@ -276,45 +276,61 @@ static int prodosfs_release(const char *path, struct fuse_file_info *fi)
 
 static int prodosfs_getxattr(const char *path, const char *name, char *value, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p)", path, name, value);
+    LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p, %zd)", path, name, value, size);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
         return -ToErrno(context_t::Error());
     }
 
-    int length = 0;
     auto attributes = S_GetAttributes(entry);
     auto itr = attributes.find(name);
-    if (itr != attributes.end()) {
-        if (value) {
-            strcpy(value, itr->second.c_str());
-        }
-        length += itr->second.length();
+
+    if (itr == attributes.end()) {
+        return -ENODATA;
     }
 
-    return length;
+    size_t value_size = itr->second.length() + 1;
+    if (size > 0) {
+        if (size < value_size) {
+            return -ERANGE;
+        }
+        strcpy(value, itr->second.c_str());
+    }
+
+    return (int)value_size;
 }
 
 static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p)", path, buffer);
+    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p, %zd)", path, buffer, size);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
         return -ToErrno(context_t::Error());
     }
 
-    int length = 0;
+    char *  position = buffer;
+    size_t  remaining = size;
+
+    size_t length = 0;
     auto attributes = S_GetAttributes(entry);
-    for (auto attr : attributes) {
-        if (buffer) {
-            snprintf(buffer + length, size - length, "%s", attr.first.c_str());
+    for (const auto & attr : attributes) {
+        auto name_size = attr.first.length() + 1;
+        if (size > 0) {
+            if (attr.first.length() < remaining) {
+                snprintf(position, name_size, "%s", attr.first.c_str());
+                position += name_size;
+                remaining -= name_size;
+            }
+            else {
+                return -ERANGE;
+            }
         }
-        length += attr.first.length() + 1;
+        length += name_size;
     }
 
-    return length;
+    return (int)length;
 }
 
 static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)

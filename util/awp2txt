@@ -3,7 +3,6 @@
 # AppleWorks-WordProcessor-to-Text translator.
 # https://prodos8.com/docs/technote/ftn/1a/
 #
-# TODO work on file instead of STDIN
 use strict;
 use warnings;
 use Getopt::Long;
@@ -16,7 +15,7 @@ my %OPT = ();
 GetOptions(\%OPT, "help|h", "width=i", "plain!", "debug|d") or exit(1);
 if ($OPT{help}) {
     print <<USAGE ;
-usage:  $0 [opts] < <file>
+usage:  $0 [opts] <file>
 
 options:
 
@@ -31,22 +30,31 @@ if ($OPT{width}) {
     $WIDTH = $OPT{width};
 }
 
+if (@ARGV != 1) {
+    print STDERR "$0: no file specified\n";
+    exit(1)
+}
+
+open(FILE, '<', $ARGV[0]) or die "$0: unable to open file -- $!\n";
+
 my $justification = 'NONE';
 my $buffer = undef;
 my $indent = "";
-my $recnum = 0;
-my $n = sysread(STDIN, $buffer, 300);
-while (sysread(STDIN, $buffer, 2) == 2) {
-    $recnum++;
+my $offset = 0;
+my $n = sysread(FILE, $buffer, 300);
+while (sysread(FILE, $buffer, 2) == 2) {
+    $offset = sysseek(FILE, 0, 1) - 2;
     my ($arg, $cmd) =  unpack "CC", $buffer;
     if ($cmd == 0xFF and $arg == 0xFF) {
         DEBUG("found end-of-document record [%02X%02X]", $arg, $cmd);
-        # TODO handle file tags?
+        if (not eof(FILE)) {
+            print STDERR "$0: there is data after the document\n";
+        }
         last;
     }
     elsif ($cmd == 0x00) {
         DEBUG("found text record [%02X%02X]", $arg, $cmd);
-        $n = sysread(STDIN, $buffer, $arg);
+        $n = sysread(FILE, $buffer, $arg);
         my ($b2, $b3) = unpack "CC", $buffer;
         my $line = substr($buffer, 2);
 
@@ -141,7 +149,7 @@ while (sysread(STDIN, $buffer, 2) == 2) {
 sub DEBUG
 {
     return unless ($OPT{debug});
-    printf STDERR "$0: %d - $_[0]\n", $recnum, @_[1..$#_];
+    printf STDERR "%06X: $_[0]\n", $offset, @_[1..$#_];
 }
 
 # eof

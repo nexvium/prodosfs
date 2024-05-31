@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# AppleWorks-WordProcessor-to-Text translator.
+# AppleWorks Word Processor to Text translator.
 # https://prodos8.com/docs/technote/ftn/1a/
 #
 use strict;
@@ -9,6 +9,19 @@ use Getopt::Long;
 
 $0 = (split m#/#, $0)[-1];
 
+my %COLOR = ( bold_on     => "\e[1m",
+              bold_off    => "\e[22m",
+              under_on    => "\e[4m",
+              under_off   => "\e[24m",
+              faint_on    => "\e[2m",
+              faint_off   => "\e[22m"  );
+my %PLAIN = ( bold_on     => "",
+              bold_off    => "",
+              under_on    => "",
+              under_off   => "",
+              faint_on    => "",
+              faint_off   => ""  );
+my %C = %COLOR;
 my $WIDTH = $ENV{COLUMNS} || 120;
 my %OPT = ();
 
@@ -30,21 +43,38 @@ if ($OPT{width}) {
     $WIDTH = $OPT{width};
 }
 
-if (@ARGV != 1) {
+if ($OPT{plain} || (! -t STDOUT && ! defined $OPT{plain})) {
+    %C = %PLAIN;
+}
+
+if (@ARGV < 1) {
     print STDERR "$0: no file specified\n";
-    exit(1)
+    exit(1);
+}
+elsif (@ARGV > 1) {
+    print STDERR "$0: only one file may be specified\n";
+    exit(1);
 }
 
 open(FILE, '<', $ARGV[0]) or die "$0: unable to open file -- $!\n";
 
-my $justification = 'NONE';
-my $buffer = undef;
-my $indent = "";
-my $offset = 0;
-my $n = sysread(FILE, $buffer, 300);
-while (sysread(FILE, $buffer, 2) == 2) {
-    $offset = sysseek(FILE, 0, 1) - 2;
-    my ($arg, $cmd) =  unpack "CC", $buffer;
+my $ALIGNMENT = 'NONE';
+my $SECTION = 'BODY';
+my (@HEADER, @FOOTER) = ();
+my $BUFFER = undef;
+my $INDENT = "";
+my $OFFSET = 0;
+
+my $n = sysread(FILE, $BUFFER, 300);
+my $magic = substr($BUFFER, 2, 3);
+if ($magic ne "\x00\x00\x4f") {
+    print STDERR "$0: does not appear to be an appleworks word processor file\n";
+    exit(1)
+}
+
+while (sysread(FILE, $BUFFER, 2) == 2) {
+    $OFFSET = sysseek(FILE, 0, 1) - 2;
+    my ($arg, $cmd) =  unpack "CC", $BUFFER;
     if ($cmd == 0xFF and $arg == 0xFF) {
         DEBUG("found end-of-document record [%02X%02X]", $arg, $cmd);
         if (not eof(FILE)) {
@@ -54,92 +84,138 @@ while (sysread(FILE, $buffer, 2) == 2) {
     }
     elsif ($cmd == 0x00) {
         DEBUG("found text record [%02X%02X]", $arg, $cmd);
-        $n = sysread(FILE, $buffer, $arg);
-        my ($b2, $b3) = unpack "CC", $buffer;
-        my $line = substr($buffer, 2);
+        $n = sysread(FILE, $BUFFER, $arg);
+        my ($b2, $b3) = unpack "CC", $BUFFER;
+        my $line = substr($BUFFER, 2);
+        my $output = '';
 
-        if ($justification eq 'CENTER') {
-            print " " x ( ($WIDTH - length($line)) / 2 );
+        if ($ALIGNMENT eq 'CENTER') {
+            $output .= sprintf "%s", " " x ( ($WIDTH - length($line)) / 2 );
         }
-        elsif ($justification eq 'JUSTIFY') {
+        elsif ($ALIGNMENT eq 'JUSTIFY') {
             die "can't handle justify command yet\n";
         }
         else {
-            print $indent;
+            $output .= sprintf "%s", $INDENT;
         }
 
-        if ($justification eq 'NONE') {
-            print " " x ($b2 & 0x7f);
+        if ($ALIGNMENT eq 'NONE') {
+            $output .= sprintf "%s", " " x ($b2 & 0x7f);
         }
 
-        if (-t STDOUT || (defined $OPT{plain} && $OPT{plain} == 0)) {
-            $line =~ s/\x01/\e[1m/g;    # underline start
-            $line =~ s/\x02/\e[22m/g;   # underline end
-            $line =~ s/\x07/\e[4m/g;    # bold start
-            $line =~ s/\x08/\e[24m/g;   # bold end
-        }
+        $line =~ s/\x01/$C{bold_on}/g;
+        $line =~ s/\x02/$C{bold_off}/g;
+        $line =~ s/\x07/$C{under_on}/g;
+        $line =~ s/\x08/$C{under_off}/g;
 
-        $line =~ s/x01/{BOLD->}/g;
-        $line =~ s/x02/{<-BOLD}/g;
-        $line =~ s/x03/{SUPER->}/g;
-        $line =~ s/x04/{<-SUPER}/g;
-        $line =~ s/x05/{SUB->}/g;
-        $line =~ s/x06/{<-SUB}/g;
-        $line =~ s/x07/{UNDER->}/g;
-        $line =~ s/x08/{<-UNDER}/g;
-        $line =~ s/x09/{PAGE NO}/g;
-        $line =~ s/x0A/{KEYBOARD}/g;
-        $line =~ s/x0B/{STICKY SPACE}/g;
-        $line =~ s/x0C/{MAIL MERGE}/g;
-        $line =~ s/x0D/{0D}/g;
-        $line =~ s/x0E/{DATE}/g;
-        $line =~ s/x0F/{TIME}/g;
-        $line =~ s/x10/{10}/g;
-        $line =~ s/x11/{11}/g;
-        $line =~ s/x12/{12}/g;
-        $line =~ s/x13/{13}/g;
-        $line =~ s/x14/{14}/g;
-        $line =~ s/x15/{15}/g;
+        $line =~ s/\x03/$C{faint_on}:SUPER->:$C{faint_off}/g;
+        $line =~ s/\x04/$C{faint_on}:<-SUPER:$C{faint_off}/g;
+        $line =~ s/\x05/$C{faint_on}:SUB->:$C{faint_off}/g;
+        $line =~ s/\x06/$C{faint_on}:<-SUB:$C{faint_off}/g;
+        $line =~ s/\x09/$C{faint_on}:PAGE NO:$C{faint_off}/g;
+        $line =~ s/\x0A/$C{faint_on}:KEYBOARD:$C{faint_off}/g;
+        $line =~ s/\x0B/$C{faint_on}:STICKY SPACE:$C{faint_off}/g;
+        $line =~ s/\x0C/$C{faint_on}:MAIL MERGE:$C{faint_off}/g;
+        $line =~ s/\x0D/$C{faint_on}:0D:$C{faint_off}/g;
+        $line =~ s/\x0E/$C{faint_on}:DATE:$C{faint_off}/g;
+        $line =~ s/\x0F/$C{faint_on}:TIME:$C{faint_off}/g;
+        $line =~ s/\x10/$C{faint_on}:10:$C{faint_off}/g;
+        $line =~ s/\x11/$C{faint_on}:11:$C{faint_off}/g;
+        $line =~ s/\x12/$C{faint_on}:12:$C{faint_off}/g;
+        $line =~ s/\x13/$C{faint_on}:13:$C{faint_off}/g;
+        $line =~ s/\x14/$C{faint_on}:14:$C{faint_off}/g;
+        $line =~ s/\x15/$C{faint_on}:15:$C{faint_off}/g;
         $line =~ s/[\x16-\x17]/ /g;      # tabs to spaces
-        $line =~ s/x18/{18}/g;
+        $line =~ s/\x18/$C{faint_on}:18:$C{faint_off}/g;
 
-        print "$line";
-        if ($b3 & 0x80) {
-            print "\n";
+        if ($b3 & 0x80 or $INDENT ne '') {
+            $line .= "\n";
+        }
+
+        $output .= $line;
+
+        if ($SECTION eq 'HEADER') {
+            push @HEADER, $output;
+        }
+        elsif ($SECTION eq 'FOOTER') {
+            push @FOOTER, $output;
+        }
+        else {
+            if ($SECTION eq 'BODY_TOP') {
+                print join('', map{ $C{faint_on} . $_ . $C{faint_off} } @HEADER);
+                $SECTION = 'BODY';
+            }
+            print $output;
         }
     }
     elsif ($cmd == 0xD0) {
         DEBUG("found carriage return record [%02X%02X]", $arg, $cmd);
-        print " " x $arg, "\n";
+        my $output = (" " x $arg) . "\n";
+        if ($SECTION eq 'HEADER') {
+            push @HEADER, $output;
+        }
+        elsif ($SECTION eq 'FOOTER') {
+            push @FOOTER, $output;
+        }
+        else {
+            if ($SECTION eq 'BODY_TOP') {
+                print join('', map{ $C{faint_on} . $_ . $C{faint_off} } @HEADER);
+                $SECTION = 'BODY';
+            }
+            print $output;
+        }
+    }
+    elsif ($cmd == 0xD5 or $cmd == 0xD6) {
+        DEBUG("found page header or footer end record [%02X%02X]", $arg, $cmd);
+        $SECTION = 'BODY';
     }
     elsif ($cmd == 0xD9) {
         DEBUG("ignoring left margin record [%02X%02X]", $arg, $cmd);
-        #if ($arg > 0) {
-        #    $indent = " " x $arg;
-        #}
-        #elsif ($ENV{COLUMNS} > 80) {
-        #    $indent = " " x (($ENV{COLUMNS} - 80) / 2);
-        #}
+    }
+    elsif ($cmd == 0xDA) {
+        DEBUG("ignoring right margin record [%02X%02X]", $arg, $cmd);
+    }
+    elsif ($cmd == 0xDB) {
+        DEBUG("ignoring characters per inch record [%02X%02X]", $arg, $cmd);
     }
     elsif ($cmd == 0xDE) {
-        die "can't handle indent command yet\n";
+        DEBUG("found INDENT record [%02X%02X]", $arg, $cmd);
+        $INDENT = ' ' x $arg;
     }
     elsif ($cmd == 0xDF) {
         DEBUG("found justify record [%02X%02X]", $arg, $cmd);
-        $justification = 'JUSTIFY';
+        $ALIGNMENT = 'JUSTIFY';
     }
     elsif ($cmd == 0xE0) {
         DEBUG("found unjustify record [%02X%02X]", $arg, $cmd);
-        $justification = 'NONE';
+        $ALIGNMENT = 'NONE';
     }
     elsif ($cmd == 0xE1) {
         DEBUG("found center record [%02X%02X]", $arg, $cmd);
-        $justification = 'CENTER';
+        $ALIGNMENT = 'CENTER';
     }
     elsif ($cmd == 0xE9) {
         DEBUG("found new page record [%02X%02X]", $arg, $cmd);
-        my $line = sprintf "---[ PAGE BREAK ]---";
-        print $line, "-" x ($WIDTH - length($line) - 1), "\n";
+        my $line = sprintf "$C{faint_on}---[ PAGE BREAK ]---";
+        print $line, "-" x ($WIDTH - length($line) - 1), "$C{faint_off}\n";
+    }
+    elsif ($cmd == 0xEC) {
+        DEBUG("found page header record [%02X%02X]", $arg, $cmd);
+        $SECTION = 'HEADER';
+        @HEADER = ();
+    }
+    elsif ($cmd == 0xED) {
+        DEBUG("found page footer record [%02X%02X]", $arg, $cmd);
+        $SECTION = 'FOOTER';
+        @FOOTER = ();
+    }
+    elsif ($cmd == 0xF4) {
+        DEBUG("found page break record [%02X%02X]", $arg, $cmd);
+        print $C{faint_on}, join('', @FOOTER), $C{faint_off};
+        print join('', map{ $C{faint_on} . $_ . $C{faint_off} } @FOOTER);
+        my $line = sprintf "$C{faint_on}---[ PAGE %d ]---", $arg ;
+        print $line, "-" x ($WIDTH - length($line) - 1), "$C{faint_off}\n";
+        $SECTION = 'BODY_TOP';
     }
     else {
         DEBUG("ignoring unknown record [%02X%02X]", $arg, $cmd);
@@ -149,7 +225,7 @@ while (sysread(FILE, $buffer, 2) == 2) {
 sub DEBUG
 {
     return unless ($OPT{debug});
-    printf STDERR "%06X: $_[0]\n", $offset, @_[1..$#_];
+    printf STDERR "%06X: $_[0]\n", $OFFSET, @_[1..$#_];
 }
 
 # eof

@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 #
-# AppleWorks-to-Text translator.
+# AppleWorks-WordProcessor-to-Text translator.
 # https://prodos8.com/docs/technote/ftn/1a/
 #
+# TODO work on file instead of STDIN
 use strict;
 use warnings;
 use Getopt::Long;
@@ -12,7 +13,7 @@ $0 = (split m#/#, $0)[-1];
 my $WIDTH = $ENV{COLUMNS} || 120;
 my %OPT = ();
 
-GetOptions(\%OPT, "help|h", "width=i", "plain!") or exit(1);
+GetOptions(\%OPT, "help|h", "width=i", "plain!", "debug|d") or exit(1);
 if ($OPT{help}) {
     print <<USAGE ;
 usage:  $0 [opts] < <file>
@@ -22,6 +23,7 @@ options:
     -h --help           print usage message
     -w --width          specify "page" width instead of using term width
        --[no-]plain     preserve (or not) bold, underline, etc
+    -d --debug          output debugging messages to stderr
 USAGE
 }
 
@@ -29,17 +31,21 @@ if ($OPT{width}) {
     $WIDTH = $OPT{width};
 }
 
-my $justification = 'UNJUSTIFY';
+my $justification = 'NONE';
 my $buffer = undef;
 my $indent = "";
+my $recnum = 0;
 my $n = sysread(STDIN, $buffer, 300);
 while (sysread(STDIN, $buffer, 2) == 2) {
+    $recnum++;
     my ($arg, $cmd) =  unpack "CC", $buffer;
-    if ($cmd == 0xFF and $arg = 0xFF) {
-        # end of document
+    if ($cmd == 0xFF and $arg == 0xFF) {
+        DEBUG("found end-of-document record [%02X%02X]", $arg, $cmd);
+        # TODO handle file tags?
         last;
     }
     elsif ($cmd == 0x00) {
+        DEBUG("found text record [%02X%02X]", $arg, $cmd);
         $n = sysread(STDIN, $buffer, $arg);
         my ($b2, $b3) = unpack "CC", $buffer;
         my $line = substr($buffer, 2);
@@ -54,45 +60,88 @@ while (sysread(STDIN, $buffer, 2) == 2) {
             print $indent;
         }
 
-        if (($b2 & 0x7f) == $b2 && $justification eq 'UNJUSTIFY') {
-            print " " x $b2;
+        if ($justification eq 'NONE') {
+            print " " x ($b2 & 0x7f);
         }
 
         if (-t STDOUT || (defined $OPT{plain} && $OPT{plain} == 0)) {
-            $line =~ s/\x01/\e[1m/g;
-            $line =~ s/\x02/\e[22m/g;
-            $line =~ s/\x07/\e[4m/g;
-            $line =~ s/\x08/\e[24m/g;
+            $line =~ s/\x01/\e[1m/g;    # underline start
+            $line =~ s/\x02/\e[22m/g;   # underline end
+            $line =~ s/\x07/\e[4m/g;    # bold start
+            $line =~ s/\x08/\e[24m/g;   # bold end
         }
-        else {
-            $line =~ s/[\x01-\x18]//g;
-        }
+
+        $line =~ s/x01/{BOLD->}/g;
+        $line =~ s/x02/{<-BOLD}/g;
+        $line =~ s/x03/{SUPER->}/g;
+        $line =~ s/x04/{<-SUPER}/g;
+        $line =~ s/x05/{SUB->}/g;
+        $line =~ s/x06/{<-SUB}/g;
+        $line =~ s/x07/{UNDER->}/g;
+        $line =~ s/x08/{<-UNDER}/g;
+        $line =~ s/x09/{PAGE NO}/g;
+        $line =~ s/x0A/{KEYBOARD}/g;
+        $line =~ s/x0B/{STICKY SPACE}/g;
+        $line =~ s/x0C/{MAIL MERGE}/g;
+        $line =~ s/x0D/{0D}/g;
+        $line =~ s/x0E/{DATE}/g;
+        $line =~ s/x0F/{TIME}/g;
+        $line =~ s/x10/{10}/g;
+        $line =~ s/x11/{11}/g;
+        $line =~ s/x12/{12}/g;
+        $line =~ s/x13/{13}/g;
+        $line =~ s/x14/{14}/g;
+        $line =~ s/x15/{15}/g;
+        $line =~ s/[\x16-\x17]/ /g;      # tabs to spaces
+        $line =~ s/x18/{18}/g;
 
         print "$line";
         if ($b3 & 0x80) {
             print "\n";
         }
     }
+    elsif ($cmd == 0xD0) {
+        DEBUG("found carriage return record [%02X%02X]", $arg, $cmd);
+        print " " x $arg, "\n";
+    }
     elsif ($cmd == 0xD9) {
-        if ($arg > 0) {
-            $indent = " " x $arg;
-        }
-        elsif ($ENV{COLUMNS} > 80) {
-            $indent = " " x (($ENV{COLUMNS} - 80) / 2);
-        }
+        DEBUG("ignoring left margin record [%02X%02X]", $arg, $cmd);
+        #if ($arg > 0) {
+        #    $indent = " " x $arg;
+        #}
+        #elsif ($ENV{COLUMNS} > 80) {
+        #    $indent = " " x (($ENV{COLUMNS} - 80) / 2);
+        #}
     }
     elsif ($cmd == 0xDE) {
         die "can't handle indent command yet\n";
     }
     elsif ($cmd == 0xDF) {
+        DEBUG("found justify record [%02X%02X]", $arg, $cmd);
         $justification = 'JUSTIFY';
     }
     elsif ($cmd == 0xE0) {
+        DEBUG("found unjustify record [%02X%02X]", $arg, $cmd);
         $justification = 'NONE';
     }
     elsif ($cmd == 0xE1) {
+        DEBUG("found center record [%02X%02X]", $arg, $cmd);
         $justification = 'CENTER';
     }
+    elsif ($cmd == 0xE9) {
+        DEBUG("found new page record [%02X%02X]", $arg, $cmd);
+        my $line = sprintf "---[ PAGE BREAK ]---";
+        print $line, "-" x ($WIDTH - length($line) - 1), "\n";
+    }
+    else {
+        DEBUG("ignoring unknown record [%02X%02X]", $arg, $cmd);
+    }
+}
+
+sub DEBUG
+{
+    return unless ($OPT{debug});
+    printf STDERR "$0: %d - $_[0]\n", $recnum, @_[1..$#_];
 }
 
 # eof

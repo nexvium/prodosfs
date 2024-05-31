@@ -93,7 +93,7 @@ static std::string S_AccessToString(uint8_t access)
     // Would be nice if the STL provided a join function.
     std::string str;
     for (const auto & flag : allowed) {
-        if (!str.empty())   str += " | ";
+        if (!str.empty()) str += " | ";
         str += flag;
     }
 

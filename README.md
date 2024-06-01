@@ -52,3 +52,10 @@ prodos.file_type_name="AWP"
 prodos.min_version="0"
 prodos.version="8"
 ```
+# To Do
+
+- [ ] Comment code
+- [ ] Mount as read-only
+- [ ] Add option to background self
+- [ ] Add option to mount under volume name
+- [ ] Add option to disable ProDOS-to-Unix text file translation

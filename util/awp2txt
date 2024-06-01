@@ -118,25 +118,25 @@ while (sysread(FILE, $BUFFER, 2) == 2) {
         $line =~ s/\x07/$C{under_on}/g;
         $line =~ s/\x08/$C{under_off}/g;
 
-        $line =~ s/\x03/$C{faint_on}:SUPER->:$C{faint_off}/g;
-        $line =~ s/\x04/$C{faint_on}:<-SUPER:$C{faint_off}/g;
-        $line =~ s/\x05/$C{faint_on}:SUB->:$C{faint_off}/g;
-        $line =~ s/\x06/$C{faint_on}:<-SUB:$C{faint_off}/g;
-        $line =~ s/\x09/$C{faint_on}:PAGE NO:$C{faint_off}/g;
-        $line =~ s/\x0A/$C{faint_on}:KEYBOARD:$C{faint_off}/g;
-        $line =~ s/\x0B/$C{faint_on}:STICKY SPACE:$C{faint_off}/g;
-        $line =~ s/\x0C/$C{faint_on}:MAIL MERGE:$C{faint_off}/g;
-        $line =~ s/\x0D/$C{faint_on}:0D:$C{faint_off}/g;
-        $line =~ s/\x0E/$C{faint_on}:DATE:$C{faint_off}/g;
-        $line =~ s/\x0F/$C{faint_on}:TIME:$C{faint_off}/g;
-        $line =~ s/\x10/$C{faint_on}:10:$C{faint_off}/g;
-        $line =~ s/\x11/$C{faint_on}:11:$C{faint_off}/g;
-        $line =~ s/\x12/$C{faint_on}:12:$C{faint_off}/g;
-        $line =~ s/\x13/$C{faint_on}:13:$C{faint_off}/g;
-        $line =~ s/\x14/$C{faint_on}:14:$C{faint_off}/g;
-        $line =~ s/\x15/$C{faint_on}:15:$C{faint_off}/g;
+        $line =~ s/\x03/$C{faint_on}\[SUPER->\]$C{faint_off}/g;
+        $line =~ s/\x04/$C{faint_on}\[<-SUPER\]$C{faint_off}/g;
+        $line =~ s/\x05/$C{faint_on}\[SUB->\]$C{faint_off}/g;
+        $line =~ s/\x06/$C{faint_on}\[<-SUB\]$C{faint_off}/g;
+        $line =~ s/\x09/$C{faint_on}\[PAGE NO\]$C{faint_off}/g;
+        $line =~ s/\x0A/$C{faint_on}\[KEYBOARD\]$C{faint_off}/g;
+        $line =~ s/\x0B/$C{faint_on}\[STICKY SPACE\]$C{faint_off}/g;
+        $line =~ s/\x0C/$C{faint_on}\[MAIL MERGE\]$C{faint_off}/g;
+        $line =~ s/\x0D/$C{faint_on}\[0D\]$C{faint_off}/g;
+        $line =~ s/\x0E/$C{faint_on}\[DATE\]$C{faint_off}/g;
+        $line =~ s/\x0F/$C{faint_on}\[TIME\]$C{faint_off}/g;
+        $line =~ s/\x10/$C{faint_on}\[10\]$C{faint_off}/g;
+        $line =~ s/\x11/$C{faint_on}\[11\]$C{faint_off}/g;
+        $line =~ s/\x12/$C{faint_on}\[12\]$C{faint_off}/g;
+        $line =~ s/\x13/$C{faint_on}\[13\]$C{faint_off}/g;
+        $line =~ s/\x14/$C{faint_on}\[14\]$C{faint_off}/g;
+        $line =~ s/\x15/$C{faint_on}\[15\]$C{faint_off}/g;
         $line =~ s/[\x16-\x17]/ /g;      # tabs to spaces
-        $line =~ s/\x18/$C{faint_on}:18:$C{faint_off}/g;
+        $line =~ s/\x18/$C{faint_on}\[8\]$C{faint_off}/g;
 
         if ($b3 & 0x80 or $INDENT ne '') {
             $line .= "\n";

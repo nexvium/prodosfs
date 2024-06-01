@@ -346,7 +346,7 @@ static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 
 static void prodosfs_destroy(void *private_data)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_init(%p)", private_data);
+    LogMessage(LOG_DEBUG1, "prodosfs_destroy(%p)", private_data);
 
     auto ctx = (context_t *)private_data;
     auto volume_name = ctx->GetVolumeName();

@@ -47,6 +47,10 @@ if ($OPT{plain} || (! -t STDOUT && ! defined $OPT{plain})) {
     %C = %PLAIN;
 }
 
+if ($OPT{debug}) {
+    $| = 1;
+}
+
 if (@ARGV < 1) {
     print STDERR "$0: no file specified\n";
     exit(1);
@@ -74,6 +78,7 @@ if ($magic ne "\x00\x00\x4f") {
 
 while (sysread(FILE, $BUFFER, 2) == 2) {
     $OFFSET = sysseek(FILE, 0, 1) - 2;
+
     my ($arg, $cmd) =  unpack "CC", $BUFFER;
     if ($cmd == 0xFF and $arg == 0xFF) {
         DEBUG("found end-of-document record [%02X%02X]", $arg, $cmd);
@@ -87,8 +92,13 @@ while (sysread(FILE, $BUFFER, 2) == 2) {
         $n = sysread(FILE, $BUFFER, $arg);
         my ($b2, $b3) = unpack "CC", $BUFFER;
         my $line = substr($BUFFER, 2);
-        my $output = '';
 
+        if ($b2 eq 0xFF) {
+            print $C{faint_on} . $line . $C{faint_off} . "\n";
+            next;
+        }
+
+        my $output = '';
         if ($ALIGNMENT eq 'CENTER') {
             $output .= sprintf "%s", " " x ( ($WIDTH - length($line)) / 2 );
         }
@@ -179,7 +189,7 @@ while (sysread(FILE, $BUFFER, 2) == 2) {
         DEBUG("ignoring characters per inch record [%02X%02X]", $arg, $cmd);
     }
     elsif ($cmd == 0xDE) {
-        DEBUG("found INDENT record [%02X%02X]", $arg, $cmd);
+        DEBUG("found indent record [%02X%02X]", $arg, $cmd);
         $INDENT = ' ' x $arg;
     }
     elsif ($cmd == 0xDF) {
@@ -213,8 +223,8 @@ while (sysread(FILE, $BUFFER, 2) == 2) {
         DEBUG("found page break record [%02X%02X]", $arg, $cmd);
         print $C{faint_on}, join('', @FOOTER), $C{faint_off};
         print join('', map{ $C{faint_on} . $_ . $C{faint_off} } @FOOTER);
-        my $line = sprintf "$C{faint_on}---[ PAGE %d ]---", $arg ;
-        print $line, "-" x ($WIDTH - length($line) - 1), "$C{faint_off}\n";
+        my $line = sprintf "---[ PAGE %d ]---", $arg ;
+        print $C{faint_on}, $line, "-" x ($WIDTH - length($line) - 1), "$C{faint_off}\n";
         $SECTION = 'BODY_TOP';
     }
     else {

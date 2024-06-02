@@ -114,7 +114,7 @@ static std::string S_AppleWorksFileName(const std::string & filename, uint16_t a
     auto mask = ((aux_type & 0x00FF) << 8) | ((aux_type & 0xFF00) >> 8);
     for (auto i = 0; i < filename.length(); i++) {
         if (mask & 1 << (15 - i)) {
-            buffer[i] = filename[i] == '.' ? ' ' : tolower(filename[i]);
+            buffer[i] = filename[i] == '.' ? ' ' : (char)tolower(filename[i]);
         }
         else {
             buffer[i] = filename[i];
@@ -173,7 +173,7 @@ static attributes_t S_GetAttributes(const entry_t * entry)
 ** FUSE operations.
 */
 
-static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *fi)
+static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *)
 {
     LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p)", path, st);
 
@@ -256,9 +256,9 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
     return (int)n;
 }
 
-static int prodosfs_release(const char *path, struct fuse_file_info *fi)
+static int prodosfs_close(const char *path, struct fuse_file_info *fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_release(\"%s\", %p)", path, fi);
+    LogMessage(LOG_DEBUG1, "prodosfs_close(\"%s\", %p)", path, fi);
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     fh->Close();
@@ -326,9 +326,9 @@ static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
     return (int)length;
 }
 
-static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
+static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_init()");
+    LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
     try {
         context = new context_t(disk_image);
@@ -344,9 +344,9 @@ static void *prodosfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
     return context;
 }
 
-static void prodosfs_destroy(void *private_data)
+static void prodosfs_umount(void *private_data)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_destroy(%p)", private_data);
+    LogMessage(LOG_DEBUG1, "prodosfs_umount(%p)", private_data);
 
     auto ctx = (context_t *)private_data;
     auto volume_name = ctx->GetVolumeName();
@@ -380,7 +380,7 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
 
     auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
-    const entry_t *entry = nullptr;
+    const entry_t * entry = nullptr;
     while ((entry = dh->NextEntry()) != nullptr) {
         std::string name = entry->FileName();
         LogMessage(LOG_DEBUG2, "found entry: %s", name.c_str());
@@ -397,9 +397,9 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
-static int prodosfs_releasedir(const char *path, struct fuse_file_info *fi)
+static int prodosfs_closedir(const char *path, struct fuse_file_info *fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_releasedir(\"%s\", %p)", path, fi);
+    LogMessage(LOG_DEBUG1, "prodosfs_closedir(\"%s\", %p)", path, fi);
 
     auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     dh->Close();
@@ -413,14 +413,14 @@ static struct fuse_operations operations =
     .getattr    = prodosfs_getattr,
     .open       = prodosfs_open,
     .read       = prodosfs_read,
-    .release    = prodosfs_release,
+    .release    = prodosfs_close,
     .getxattr   = prodosfs_getxattr,
     .listxattr  = prodosfs_listxattr,
     .opendir    = prodosfs_opendir,
     .readdir    = prodosfs_readdir,
-    .releasedir = prodosfs_releasedir,
-    .init       = prodosfs_init,
-    .destroy    = prodosfs_destroy,
+    .releasedir = prodosfs_closedir,
+    .init       = prodosfs_mount,
+    .destroy    = prodosfs_umount,
 };
 
 /*=================================================================================================
@@ -429,7 +429,6 @@ static struct fuse_operations operations =
 
 int main(int argc, char *argv[])
 {
-    int rv = 0;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
     if (argc != 4) {
@@ -442,7 +441,7 @@ int main(int argc, char *argv[])
 
     SetLogger(LogMessage);
 
-    rv = fuse_main(argc, argv, &operations, nullptr);
+    int rv = fuse_main(argc, argv, &operations, nullptr);
 
     return rv;
 }

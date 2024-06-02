@@ -31,6 +31,8 @@ enum file_type_t
     file_type_appleworks_db     = 0x19,
     file_type_appleworks_wp     = 0x1A,
     file_type_appleworks_ss     = 0x1B,
+    file_type_pascal            = 0xEF,
+    file_type_command           = 0xF0,
     file_type_integer_basic     = 0xFA,
     file_type_applesoft_basic   = 0xFC,
     file_type_prodos_system     = 0xFF,

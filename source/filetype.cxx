@@ -8,8 +8,6 @@
 
 #include <unordered_map>
 
-#include <string.h>
-
 namespace prodos
 {
 
@@ -17,7 +15,7 @@ typedef std::unordered_map<uint8_t, const file_type_info_t>  file_type_table_t;
 
 // Forward declaration for internal table so that it can be
 // referenced before it is defined, since it is long.
-namespace {  extern file_type_table_t  file_type_table; }
+namespace { extern file_type_table_t  file_type_table; }
 
 const file_type_info_t *
 GetFileTypeInfo(uint8_t type)
@@ -313,11 +311,11 @@ file_type_table_t  file_type_table =
     ADD_FILE_TYPE(0xF7,  "UD7",     "User defined type 7 file"),
     ADD_FILE_TYPE(0xF8,  "UD8",     "User defined type 8 file"),
     ADD_FILE_TYPE(0xF9,  nullptr,   nullptr),
-    ADD_FILE_TYPE(0xFA,  nullptr,   nullptr),
-    ADD_FILE_TYPE(0xFB,  nullptr,   nullptr),
+    ADD_FILE_TYPE(0xFA,  "INT",     "Integer BASIC file"),
+    ADD_FILE_TYPE(0xFB,  "IVR",     "Integer BASIC variables file"),
     ADD_FILE_TYPE(0xFC,  "BAS",     "Applesoft BASIC file"),
-    ADD_FILE_TYPE(0xFD,  "VAR",     "Applesoft stored variables file"),
-    ADD_FILE_TYPE(0xFE,  "REL",     "Relocatable object module file"),
+    ADD_FILE_TYPE(0xFD,  "VAR",     "Applesoft BASIC variables file"),
+    ADD_FILE_TYPE(0xFE,  "REL",     "Relocatable code file"),
     ADD_FILE_TYPE(0xFF,  "SYS",     "System file"),
 };
 

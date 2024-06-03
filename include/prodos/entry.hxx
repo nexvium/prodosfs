@@ -16,6 +16,14 @@ namespace prodos
 
 class context_t;
 
+inline bool AXS_READ(uint8_t access)        { return access & 0b0000'0001; }
+inline bool AXS_WRITE(uint8_t access)       { return access & 0b0000'0010; }
+inline bool AXS_BACKUP(uint8_t access)      { return access & 0b0010'0000; }
+inline bool AXS_RENAME(uint8_t access)      { return access & 0b0100'0000; }
+inline bool AXS_DESTROY(uint8_t access)     { return access & 0b1000'0000; }
+
+bool IsValidName(const std::string & name);
+
 struct timestamp_t
 {
     int     year;
@@ -26,12 +34,6 @@ struct timestamp_t
 
     std::string AsString() const;
 };
-
-inline bool AXS_READ(uint8_t access)        { return access & 0b0000'0001; }
-inline bool AXS_WRITE(uint8_t access)       { return access & 0b0000'0010; }
-inline bool AXS_BACKUP(uint8_t access)      { return access & 0b0010'0000; }
-inline bool AXS_RENAME(uint8_t access)      { return access & 0b0100'0000; }
-inline bool AXS_DESTROY(uint8_t access)     { return access & 0b1000'0000; }
 
 class entry_t
 {

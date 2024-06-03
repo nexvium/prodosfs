@@ -20,8 +20,9 @@
 
 using namespace prodos;
 
-static const char *    disk_image = nullptr;
-static const int       log_level = LOG_MAX;
+static const char *     mount_dir = nullptr;
+static const char *     disk_image = nullptr;
+static const int        log_level = LOG_VERBOSE;
 
 static context_t *     context = nullptr;
 
@@ -161,6 +162,7 @@ static attributes_t S_GetAttributes(const entry_t * entry)
         attributes[XATTR("file_count")] = std::to_string(volume->FileCount());
         attributes[XATTR("total_blocks")] = std::to_string(volume->TotalBlocks());
         attributes[XATTR("used_blocks")] = std::to_string(context->CountVolumeBlocksUsed());
+        attributes[XATTR("image_file")] = disk_image;
     }
     else {
         throw std::runtime_error("unexpected file type");
@@ -339,7 +341,12 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
         exit(EXIT_FAILURE);
     }
 
-    LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
+    if (mount_dir) {
+        LogMessage(LOG_INFO, "mounted volume in %s", mount_dir);
+    }
+    else {
+        LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
+    }
 
     return context;
 }
@@ -352,7 +359,12 @@ static void prodosfs_umount(void *private_data)
     auto volume_name = ctx->GetVolumeName();
     delete ctx;
 
-    LogMessage(LOG_INFO, "unmounted volume: %s", volume_name.c_str());
+    if (mount_dir) {
+        LogMessage(LOG_INFO, "unmounted volume in %s", mount_dir);
+    }
+    else {
+        LogMessage(LOG_INFO, "unmounted volume: %s", context->GetVolumeName().c_str());
+    }
 }
 
 static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
@@ -427,6 +439,56 @@ static struct fuse_operations operations =
 ** Main
 */
 
+bool S_UpdateMountDirectory(char *argv[], const char *pathname)
+{
+    const size_t max_len = 1024;
+    static char buffer[max_len] = {};
+
+    size_t path_len = strlen(argv[2]);
+    try {
+        const context_t ctx = context_t(disk_image);
+        std::string vol_name = ctx.GetVolumeName();
+        if (path_len + 1 + vol_name.length() + 1 >= max_len) {
+            fprintf(stderr, "prodosfs: mount directory path too long\n");
+            return false;
+        }
+
+        if (IsValidName(vol_name) == false) {
+            fprintf(stderr, "prodosfs: invalid ProDOS filename -- \"%s\"\n", vol_name.c_str());
+            return false;
+        }
+
+        strcpy(buffer, argv[2]);
+        strcat(buffer, "/");
+        strcat(buffer, vol_name.c_str());
+    }
+    catch (std::exception & ex) {
+        fprintf(stderr, "prodosfs: not a ProDOS disk image -- %s\n", pathname);
+        return false;
+    }
+
+    argv[2] = buffer;
+    mount_dir = buffer;
+
+    struct stat st = {};
+    if (stat(mount_dir, &st) == 0 || errno != ENOENT) {
+        path_len = strlen(mount_dir);
+        int i = 0;
+        while (path_len + 2 < max_len && i < 10 && errno != ENOENT) {
+            i++;
+            buffer[path_len] = '-';
+            buffer[path_len + 1 ] = '0' + i;
+            stat(mount_dir, &st);
+        }
+        if (i == 0 || i == 10) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 int main(int argc, char *argv[])
 {
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
@@ -436,12 +498,27 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    disk_image = argv[3];
+    disk_image = realpath(argv[3], nullptr);
     argc--;
 
     SetLogger(LogMessage);
 
+    if (S_UpdateMountDirectory(argv, disk_image) == false) {
+        exit(EXIT_FAILURE);
+    }
+
+    // WARNING! does not do all checks mount should do
+    bool cleanup = true;
+    if (mkdir(argv[2], 0777)) {
+        fprintf(stderr, "prodosfs: unable to create mount directory\n");
+        exit(EXIT_FAILURE);
+    }
+
     int rv = fuse_main(argc, argv, &operations, nullptr);
+
+    if (cleanup) {
+        rmdir(argv[2]);
+    }
 
     return rv;
 }

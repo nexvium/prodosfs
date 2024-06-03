@@ -29,6 +29,26 @@ static void S_DecodeTimestamp(const uint8_t * ptr, timestamp_t * timestamp)
 namespace prodos
 {
 
+bool
+IsValidName(const std::string & name)
+{
+    if (name.length() < 1 || name.length() > 15) {
+        return false;
+    }
+
+    if (isalpha(name[0]) == false) {
+        return false;
+    }
+
+    for (auto i = 1; i < name.length(); i++) {
+        if (isalnum(name[i]) == false && name[i] != '.') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 //================================================================================================
 // timestamp_t
 //------------------------------------------------------------------------------------------------

@@ -452,15 +452,18 @@ bool S_UpdateMountDirectory()
     struct stat st = {};
     if (stat(mount_dir, &st) == 0 || errno != ENOENT) {
         path_len = strlen(mount_dir);
-        int i = 0;
+        int i = 1;
         while (i < 10 && errno != ENOENT) {
-            i++;
             mount_dir[path_len + 0] = '-';
             mount_dir[path_len + 1] = '0' + i;
             mount_dir[path_len + 2] = 0;
+
             stat(mount_dir, &st);
+            i++;
         }
         if (i == 10) {
+            mount_dir[path_len] = 0;
+            fprintf(stderr, "prodosfs: too many directories with volume name-- %s\n", mount_dir);
             return false;
         }
     }

@@ -20,11 +20,13 @@
 
 using namespace prodos;
 
-static const char *     mount_dir = nullptr;
-static const char *     disk_image = nullptr;
-static const int        log_level = LOG_VERBOSE;
-
-static context_t *     context = nullptr;
+static char *       mount_dir = nullptr;
+static char *       disk_image = nullptr;
+static bool         foreground = false;
+static bool         use_name  = false;
+static int          log_level = LOG_INFO;
+static bool         debug = false;
+static context_t *  context = nullptr;
 
 typedef std::unordered_map<std::string, std::string>    attributes_t;
 
@@ -342,7 +344,7 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
     }
 
     if (mount_dir) {
-        LogMessage(LOG_INFO, "mounted volume in %s", mount_dir);
+        LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);
     }
     else {
         LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
@@ -360,7 +362,7 @@ static void prodosfs_umount(void *private_data)
     delete ctx;
 
     if (mount_dir) {
-        LogMessage(LOG_INFO, "unmounted volume in %s", mount_dir);
+        LogMessage(LOG_INFO, "unmounted %s in %s", disk_image, mount_dir);
     }
     else {
         LogMessage(LOG_INFO, "unmounted volume: %s", context->GetVolumeName().c_str());
@@ -439,48 +441,39 @@ static struct fuse_operations operations =
 ** Main
 */
 
-bool S_UpdateMountDirectory(char *argv[], const char *pathname)
+bool S_UpdateMountDirectory()
 {
-    const size_t max_len = 1024;
-    static char buffer[max_len] = {};
-
-    size_t path_len = strlen(argv[2]);
+    size_t path_len = strlen(mount_dir);
     try {
         const context_t ctx = context_t(disk_image);
         std::string vol_name = ctx.GetVolumeName();
-        if (path_len + 1 + vol_name.length() + 1 >= max_len) {
-            fprintf(stderr, "prodosfs: mount directory path too long\n");
-            return false;
-        }
-
         if (IsValidName(vol_name) == false) {
-            fprintf(stderr, "prodosfs: invalid ProDOS filename -- \"%s\"\n", vol_name.c_str());
+            fprintf(stderr, "prodosfs: invalid ProDOS volume name -- \"%s\"\n", vol_name.c_str());
             return false;
         }
 
-        strcpy(buffer, argv[2]);
-        strcat(buffer, "/");
-        strcat(buffer, vol_name.c_str());
+        // Add enough space for the volume name and a potential "-N" suffix.
+        mount_dir = (char *)realloc(mount_dir, path_len + 1 + vol_name.length() + 2);
+        strcat(mount_dir, "/");
+        strcat(mount_dir, vol_name.c_str());
     }
     catch (std::exception & ex) {
-        fprintf(stderr, "prodosfs: not a ProDOS disk image -- %s\n", pathname);
+        fprintf(stderr, "prodosfs: not a ProDOS disk image -- %s\n", disk_image);
         return false;
     }
-
-    argv[2] = buffer;
-    mount_dir = buffer;
 
     struct stat st = {};
     if (stat(mount_dir, &st) == 0 || errno != ENOENT) {
         path_len = strlen(mount_dir);
         int i = 0;
-        while (path_len + 2 < max_len && i < 10 && errno != ENOENT) {
+        while (i < 10 && errno != ENOENT) {
             i++;
-            buffer[path_len] = '-';
-            buffer[path_len + 1 ] = '0' + i;
+            mount_dir[path_len + 0] = '-';
+            mount_dir[path_len + 1] = '0' + i;
+            mount_dir[path_len + 2] = 0;
             stat(mount_dir, &st);
         }
-        if (i == 0 || i == 10) {
+        if (i == 10) {
             return false;
         }
     }
@@ -488,37 +481,91 @@ bool S_UpdateMountDirectory(char *argv[], const char *pathname)
     return true;
 }
 
+static void handle_options(int argc, char *argv[])
+{
+    opterr = 0;
+    int c = 0;
+    while ((c = getopt(argc, argv, "dfhl:n")) != -1) {
+        switch (c) {
+        case 'd':
+            debug = true;
+            break;
+        case 'f':
+            foreground = true;
+            break;
+        case 'h':
+            fprintf(stdout, "usage: prodosfs [-l N] [-d] [-f] [-n] <mount dir> <image file>\n");
+            exit(EXIT_SUCCESS);
+            break;
+        case 'l':
+            log_level = atoi(optarg);
+            if (log_level < LOG_CRITICAL || log_level > LOG_MAX) {
+                fprintf(stderr, "prodosfs: log level must be 0-9 -- %s\n", optarg);
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case 'n':
+            use_name = true;
+            break;
+        case '?':
+        default:
+            fprintf(stderr, "prodosfs: invalid option -- %c\n", (char)optopt);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return;
+}
 
 int main(int argc, char *argv[])
 {
-    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+    handle_options(argc, argv);
 
-    if (argc != 4) {
-        fprintf(stderr, "usage: prodosfs -f <mount_dir> <image_file>\n");
+    if (argc - optind < 2) {
+        fprintf(stderr, "usage: prodosfs [opts] <mount_dir> <image_file>\n");
         exit(EXIT_FAILURE);
     }
 
-    disk_image = realpath(argv[3], nullptr);
-    argc--;
+    mount_dir = realpath(argv[optind], nullptr);
+    disk_image = realpath(argv[optind + 1], nullptr);
 
     SetLogger(LogMessage);
 
-    if (S_UpdateMountDirectory(argv, disk_image) == false) {
-        exit(EXIT_FAILURE);
+    bool cleanup = false;
+    if (use_name == true) {
+        if (S_UpdateMountDirectory() == false) {
+            exit(EXIT_FAILURE);
+        }
+
+        // WARNING! does not do all checks mount should do
+        cleanup = true;
+        if (mkdir(mount_dir, 0777)) {
+            fprintf(stderr, "prodosfs: unable to create mount directory -- %s\n", mount_dir);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    // WARNING! does not do all checks mount should do
-    bool cleanup = true;
-    if (mkdir(argv[2], 0777)) {
-        fprintf(stderr, "prodosfs: unable to create mount directory\n");
-        exit(EXIT_FAILURE);
+    // Build arguments vector for FUSE's main.
+    fuse_args args = FUSE_ARGS_INIT(0, nullptr);
+    fuse_opt_add_arg(&args, "prodosfs");
+    fuse_opt_add_arg(&args, "-oauto_unmount");
+    if (foreground) {
+        fuse_opt_add_arg(&args, "-f");
     }
+    if (debug) {
+        fuse_opt_add_arg(&args, "-d");
+    }
+    fuse_opt_add_arg(&args, mount_dir);
 
-    int rv = fuse_main(argc, argv, &operations, nullptr);
+    // Enter FUSE main loop.
+    int rv = fuse_main(args.argc, args.argv, &operations, nullptr);
 
     if (cleanup) {
         rmdir(argv[2]);
     }
+
+    free(disk_image);
+    free(mount_dir);
 
     return rv;
 }

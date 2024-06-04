@@ -40,7 +40,7 @@ enum log_level_t
     LOG_DEBUG1,     // 5: per fuse call
     LOG_DEBUG2,     // 6: per disk file
     LOG_DEBUG3,     // 7: > per disk file
-    LOG_MAX = 99
+    LOG_MAX = 9
 };
 
 typedef void (*Logger)(int level, const char *format, ...);

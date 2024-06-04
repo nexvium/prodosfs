@@ -61,10 +61,14 @@ timestamp_t::AsString() const
     static const char * months[] = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
                                      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
+    if (month < 1 || month > 12) {
+        return { "NONE" };
+    }
+
     sprintf(buffer, "%02d-%3s-%02d %02d:%02d %s",
                     day, months[month - 1], year, hour, minute, hour < 12 ? "AM" : "PM");
 
-    return std::string(buffer);
+    return { buffer };
 }
 
 //================================================================================================

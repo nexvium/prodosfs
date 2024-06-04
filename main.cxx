@@ -38,7 +38,11 @@ enum text_mode_t
 
 static text_mode_t text_mode = text_mode_unix;
 
-static void LogMessage(int level, const char *format, ...)
+//================================================================================================
+// Helper functions
+//------------------------------------------------------------------------------------------------
+
+static void S_LogMessage(int level, const char *format, ...)
 {
     if (level <= log_level) {
         va_list ap;
@@ -50,7 +54,7 @@ static void LogMessage(int level, const char *format, ...)
     }
 }
 
-static int ToErrno(err_t err)
+static int S_ToError(err_t err)
 {
     static std::unordered_map<err_t, int> errors = {
             { err_none,                     0       },
@@ -110,23 +114,6 @@ static std::string S_AuxTypeToString(uint16_t aux_type)
     return { buffer };
 }
 
-static std::string S_AppleWorksFileName(const std::string & filename, uint16_t aux_type)
-{
-    char buffer[16] = {};
-
-    auto mask = ((aux_type & 0x00FF) << 8) | ((aux_type & 0xFF00) >> 8);
-    for (auto i = 0; i < filename.length(); i++) {
-        if (mask & 1 << (15 - i)) {
-            buffer[i] = filename[i] == '.' ? ' ' : (char)tolower(filename[i]);
-        }
-        else {
-            buffer[i] = filename[i];
-        }
-    }
-
-    return { buffer };
-}
-
 inline std::string XATTR(const char *name)
 {
     return std::string("prodos.") + name;
@@ -154,7 +141,7 @@ static attributes_t S_GetAttributes(const entry_t * entry)
         attributes[XATTR("aux_type")] = S_AuxTypeToString(dirent->AuxType());
 
         if (IsAppleWorksFile(dirent->FileType())) {
-            auto name = S_AppleWorksFileName(dirent->FileName(), dirent->AuxType());
+            auto name = AppleWorksFileName(dirent->FileName(), dirent->AuxType());
             attributes[XATTR("appleworks_filename")] = name;
         }
     }
@@ -173,17 +160,17 @@ static attributes_t S_GetAttributes(const entry_t * entry)
     return attributes;
 }
 
-/*=================================================================================================
-** FUSE operations.
-*/
+//================================================================================================
+// FUSE operations
+//------------------------------------------------------------------------------------------------
 
 static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p)", path, st);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p)", path, st);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     st->st_nlink = 1;
@@ -220,11 +207,11 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
 
 static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
 
     auto fh = context->OpenFile(path);
     if (fh == nullptr) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(fh);
@@ -234,17 +221,17 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 
 static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, struct fuse_file_info * fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %zd, %p)", path, off, fi);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %zd, %p)", path, off, fi);
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     auto pos = fh->Seek(off, SEEK_SET);
     if (pos < 0) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     size_t n = fh->Read(buf, bufsiz);
     if (n == 0 && fh->Eof() == false) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     if (text_mode == text_mode_unix && fh->Type() == file_type_text) {
@@ -262,7 +249,7 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
 
 static int prodosfs_close(const char *path, struct fuse_file_info *fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_close(\"%s\", %p)", path, fi);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_close(\"%s\", %p)", path, fi);
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     fh->Close();
@@ -273,11 +260,11 @@ static int prodosfs_close(const char *path, struct fuse_file_info *fi)
 
 static int prodosfs_getxattr(const char *path, const char *name, char *value, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p, %zd)", path, name, value, size);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p, %zd)", path, name, value, size);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     auto attributes = S_GetAttributes(entry);
@@ -300,11 +287,11 @@ static int prodosfs_getxattr(const char *path, const char *name, char *value, si
 
 static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p, %zd)", path, buffer, size);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p, %zd)", path, buffer, size);
 
     auto entry = context->GetEntry(path);
     if (entry == nullptr) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     char *  position = buffer;
@@ -332,22 +319,22 @@ static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 
 static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_mount()");
+    S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
     try {
         context = new context_t(disk_image);
     }
     catch (std::exception & ex) {
-        LogMessage(LOG_CRITICAL, ex.what());
+        S_LogMessage(LOG_CRITICAL, ex.what());
         fuse_exit(fuse_get_context()->fuse);
         exit(EXIT_FAILURE);
     }
 
     if (mount_dir) {
-        LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);
+        S_LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);
     }
     else {
-        LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
+        S_LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
     }
 
     return context;
@@ -355,27 +342,27 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
 
 static void prodosfs_umount(void *private_data)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_umount(%p)", private_data);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_umount(%p)", private_data);
 
     auto ctx = (context_t *)private_data;
     auto volume_name = ctx->GetVolumeName();
     delete ctx;
 
     if (mount_dir) {
-        LogMessage(LOG_INFO, "unmounted %s in %s", disk_image, mount_dir);
+        S_LogMessage(LOG_INFO, "unmounted %s in %s", disk_image, mount_dir);
     }
     else {
-        LogMessage(LOG_INFO, "unmounted volume: %s", context->GetVolumeName().c_str());
+        S_LogMessage(LOG_INFO, "unmounted volume: %s", context->GetVolumeName().c_str());
     }
 }
 
 static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_opendir(\"%s\", %p)", path, fi);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_opendir(\"%s\", %p)", path, fi);
 
     auto dh = context->OpenDirectory(path);
     if (dh == nullptr) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(dh);
@@ -386,7 +373,7 @@ static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
 static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
                             fuse_file_info *fi, fuse_readdir_flags fl)
 {
-    LogMessage(LOG_DEBUG1, "prodos_readdir(\"%s\", %p, %d)", path, buf, offset);
+    S_LogMessage(LOG_DEBUG1, "prodos_readdir(\"%s\", %p, %d)", path, buf, offset);
 
     if (offset == 0) {
         filler(buf, ".", nullptr, 0, FUSE_FILL_DIR_PLUS);
@@ -397,15 +384,15 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     const entry_t * entry = nullptr;
     while ((entry = dh->NextEntry()) != nullptr) {
         std::string name = entry->FileName();
-        LogMessage(LOG_DEBUG2, "found entry: %s", name.c_str());
+        S_LogMessage(LOG_DEBUG2, "found entry: %s", name.c_str());
         if (filler(buf, name.c_str(), nullptr, 0, FUSE_FILL_DIR_PLUS)) {
-            LogMessage(LOG_WARNING, "readdir buffer full");
+            S_LogMessage(LOG_WARNING, "readdir buffer full");
             break;
         }
     }
 
     if (context_t::Error() != err_end_of_file) {
-        return -ToErrno(context_t::Error());
+        return -S_ToError(context_t::Error());
     }
 
     return 0;
@@ -413,7 +400,7 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int prodosfs_closedir(const char *path, struct fuse_file_info *fi)
 {
-    LogMessage(LOG_DEBUG1, "prodosfs_closedir(\"%s\", %p)", path, fi);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_closedir(\"%s\", %p)", path, fi);
 
     auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     dh->Close();
@@ -437,9 +424,9 @@ static struct fuse_operations operations =
     .destroy    = prodosfs_umount,
 };
 
-/*=================================================================================================
-** Main
-*/
+//================================================================================================
+// Main
+//------------------------------------------------------------------------------------------------
 
 bool S_UpdateMountDirectory()
 {
@@ -481,7 +468,7 @@ bool S_UpdateMountDirectory()
     return true;
 }
 
-static void handle_options(int argc, char *argv[])
+static void S_HandleOptions(int argc, char *argv[])
 {
     opterr = 0;
     int c = 0;
@@ -519,7 +506,7 @@ static void handle_options(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-    handle_options(argc, argv);
+    S_HandleOptions(argc, argv);
 
     if (argc - optind < 2) {
         fprintf(stderr, "usage: prodosfs [opts] <mount_dir> <image_file>\n");
@@ -529,7 +516,7 @@ int main(int argc, char *argv[])
     mount_dir = realpath(argv[optind], nullptr);
     disk_image = realpath(argv[optind + 1], nullptr);
 
-    SetLogger(LogMessage);
+    SetLogger(S_LogMessage);
 
     bool cleanup = false;
     if (use_name == true) {

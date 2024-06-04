@@ -49,6 +49,8 @@ extern Logger LOG;
 
 void SetLogger(Logger func);
 
+std::string AppleWorksFileName(const std::string & filename, uint16_t aux_type);
+
 inline uint16_t LE_Read16(const uint8_t *p)
 {
     return *(p + 1) << 8 | *(p + 0);

@@ -13,7 +13,7 @@ prodosfs is a [FUSE](https://github.com/libfuse/libfuse) filesystem that allows 
 
 This software was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
 
-Since it is intended mainly for personal use on small disks, there has been no effort spent on performance or security. There are currently little protections against misuse, unintentional or otherwise.
+Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are currently few protections against misuse, unintentional or otherwise.
 
 # Build
 
@@ -27,13 +27,23 @@ $ cmake ..
 
 # Usage
 
-The only arguments currently supported are an `-f` option to specify the mount directory and pathname to the disk image file:
+Two arguments are required: a mount directory and an image file path.
+
+A few options are currently supported:
+
+* `-h` to output a usage message
+* `-f` to run in the foreground
+* `-d` to enable fuse debugging (implies `-f`)
+* `-n` to mount as <mount dir>/<volume name> instead of <mount dir>
+* `-lN` to set the log level to N (0 = least, 9 = most)
+
+For example:
 
 ```
-$ build/prodosfs -f /mnt/prodos /path/to/image/file
+$ build/prodosfs -f -l3 -n /mnt/prodos /path/to/image/file
 ```
 
-Informational and error messages are written to `stderr`. The files are accessible until the `prodosfs` program exits due to an unexpected error or the mount directory is unmounted with `umount`.
+Log messages are written to `stderr`. The files are accessible until the `prodosfs` program exits due to an unexpected error or the mount directory is unmounted with `umount`.
 
 ## Extended attributes
 
@@ -56,6 +66,4 @@ prodos.version="8"
 
 - [ ] Comment code
 - [ ] Mount as read-only
-- [ ] Add option to background self
-- [ ] Add option to mount under volume name
 - [ ] Add option to disable ProDOS-to-Unix text file translation

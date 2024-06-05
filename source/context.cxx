@@ -211,7 +211,7 @@ context_t::GetEntry(const std::string & pathname) const
 
             auto key_pointer = entry->KeyPointer();
             auto key_block = (directory_block *)_disk.ReadBlock(key_pointer);
-            handle->Open(key_block);
+            handle->_Open(key_block);
         }
 
         entry = handle->NextEntry();

@@ -20,9 +20,8 @@ class directory_entry_t;
 class directory_handle_t
 {
 public:
-    void                    Close();
-
-    const directory_entry_t *    NextEntry();
+    void                        Close();
+    const directory_entry_t *   NextEntry();
 
 private:
     const context_t *           _context;
@@ -35,7 +34,8 @@ private:
 
     directory_handle_t(const context_t * context, const directory_block * key_block);
 
-    void    Open(const directory_block * key_block);
+    void    _Open(const directory_block * key_block);
+    void    _Next();
 };
 
 } // namespace

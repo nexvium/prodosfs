@@ -366,10 +366,8 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
     S_LogMessage(LOG_DEBUG1, "prodos_readdir(\"%s\", %p, %d)", path, buf, offset);
 
-    if (offset == 0) {
-        filler(buf, ".", nullptr, 0, FUSE_FILL_DIR_PLUS);
-        filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_PLUS);
-    }
+    filler(buf, ".", nullptr, 0, FUSE_FILL_DIR_PLUS);
+    filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_PLUS);
 
     auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     const entry_t * entry = nullptr;

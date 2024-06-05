@@ -321,17 +321,6 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
-    if (context == nullptr) {
-        try {
-            context = new context_t(disk_image);
-        }
-        catch (std::exception & ex) {
-            S_LogMessage(LOG_CRITICAL, ex.what());
-            fuse_exit(fuse_get_context()->fuse);
-            exit(EXIT_FAILURE);
-        }
-    }
-
     if (mount_dir) {
         S_LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);
     }
@@ -433,23 +422,17 @@ static struct fuse_operations operations =
 bool S_UpdateMountDirectory()
 {
     size_t path_len = strlen(mount_dir);
-    try {
-        context = new context_t(disk_image);
-        std::string vol_name = context->GetVolumeName();
-        if (IsValidName(vol_name) == false) {
-            fprintf(stderr, "prodosfs: invalid ProDOS volume name -- \"%s\"\n", vol_name.c_str());
-            return false;
-        }
 
-        // Add enough space for the volume name and a potential "-N" suffix.
-        mount_dir = (char *)realloc(mount_dir, path_len + 1 + vol_name.length() + 2 + 1);
-        strcat(mount_dir, "/");
-        strcat(mount_dir, vol_name.c_str());
-    }
-    catch (std::exception & ex) {
-        fprintf(stderr, "prodosfs: not a ProDOS disk image -- %s\n", disk_image);
+    std::string vol_name = context->GetVolumeName();
+    if (IsValidName(vol_name) == false) {
+        fprintf(stderr, "prodosfs: invalid ProDOS volume name -- \"%s\"\n", vol_name.c_str());
         return false;
     }
+
+    // Add enough space for the volume name and a potential "-N" suffix.
+    mount_dir = (char *)realloc(mount_dir, path_len + 1 + vol_name.length() + 2 + 1);
+    strcat(mount_dir, "/");
+    strcat(mount_dir, vol_name.c_str());
 
     struct stat st = {};
     if (stat(mount_dir, &st) == 0 || errno != ENOENT) {
@@ -514,7 +497,7 @@ int main(int argc, char *argv[])
 
     if (argc - optind < 2) {
         fprintf(stderr, "usage: prodosfs [opts] <mount_dir> <image_file>\n");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     mount_dir = realpath(argv[optind], nullptr);
@@ -522,17 +505,25 @@ int main(int argc, char *argv[])
 
     SetLogger(S_LogMessage);
 
+    try {
+        context = new context_t(disk_image);
+    }
+    catch (std::exception & e) {
+        fprintf(stderr, "prodosfs: %s -- %s\n", e.what(), disk_image);
+        return EXIT_FAILURE;
+    }
+
     bool cleanup = false;
     if (use_name == true) {
         if (S_UpdateMountDirectory() == false) {
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
 
         // WARNING! does not do all checks mount should do
         cleanup = true;
         if (mkdir(mount_dir, 0777)) {
             fprintf(stderr, "prodosfs: unable to create mount directory -- %s\n", mount_dir);
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 

@@ -38,6 +38,7 @@ S_Deobfuscate(const void *src_blk, void * dst_blk)
 {
     char *  pw_file = getenv("PRODOSFS_PASSWORD_FILE");
     if (pw_file == nullptr) {
+        LOG(LOG_DEBUG1, "PRODOSFS_PASSWORD_FILE env var not set");
         return;
     }
 

@@ -553,7 +553,7 @@ int main(int argc, char *argv[])
 
     fuse_opt_free_args(&args);
     if (cleanup) {
-        rmdir(argv[2]);
+        rmdir(mount_dir);
     }
 
     free(disk_image);

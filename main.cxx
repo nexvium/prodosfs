@@ -440,7 +440,7 @@ bool S_UpdateMountDirectory()
         }
 
         // Add enough space for the volume name and a potential "-N" suffix.
-        mount_dir = (char *)realloc(mount_dir, path_len + 1 + vol_name.length() + 2);
+        mount_dir = (char *)realloc(mount_dir, path_len + 1 + vol_name.length() + 2 + 1);
         strcat(mount_dir, "/");
         strcat(mount_dir, vol_name.c_str());
     }
@@ -452,18 +452,17 @@ bool S_UpdateMountDirectory()
     struct stat st = {};
     if (stat(mount_dir, &st) == 0 || errno != ENOENT) {
         path_len = strlen(mount_dir);
-        int i = 1;
-        while (i < 10 && errno != ENOENT) {
+        for (int i = 1; i < 10 && errno != ENOENT; i++) {
             mount_dir[path_len + 0] = '-';
             mount_dir[path_len + 1] = '0' + i;
             mount_dir[path_len + 2] = 0;
 
+            errno = 0;
             stat(mount_dir, &st);
-            i++;
         }
-        if (i == 10) {
+        if (errno == 0) {
             mount_dir[path_len] = 0;
-            fprintf(stderr, "prodosfs: too many directories with volume name-- %s\n", mount_dir);
+            fprintf(stderr, "prodosfs: too many directories with volume name -- %s\n", mount_dir);
             return false;
         }
     }
@@ -550,6 +549,7 @@ int main(int argc, char *argv[])
     // Enter FUSE main loop.
     int rv = fuse_main(args.argc, args.argv, &operations, nullptr);
 
+    fuse_opt_free_args(&args);
     if (cleanup) {
         rmdir(argv[2]);
     }

@@ -34,7 +34,7 @@ A few options are currently supported:
 * `-h` to output a usage message
 * `-f` to run in the foreground
 * `-d` to enable fuse debugging (implies `-f`)
-* `-n` to mount as <mount dir>/<volume name> instead of <mount dir>
+* `-n` to mount in `<mount dir>/<volume name>` instead of `<mount dir>`
 * `-lN` to set the log level to N (0 = least, 9 = most)
 
 For example:

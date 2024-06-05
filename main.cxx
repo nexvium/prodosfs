@@ -321,13 +321,15 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
-    try {
-        context = new context_t(disk_image);
-    }
-    catch (std::exception & ex) {
-        S_LogMessage(LOG_CRITICAL, ex.what());
-        fuse_exit(fuse_get_context()->fuse);
-        exit(EXIT_FAILURE);
+    if (context == nullptr) {
+        try {
+            context = new context_t(disk_image);
+        }
+        catch (std::exception & ex) {
+            S_LogMessage(LOG_CRITICAL, ex.what());
+            fuse_exit(fuse_get_context()->fuse);
+            exit(EXIT_FAILURE);
+        }
     }
 
     if (mount_dir) {
@@ -432,8 +434,8 @@ bool S_UpdateMountDirectory()
 {
     size_t path_len = strlen(mount_dir);
     try {
-        const context_t ctx = context_t(disk_image);
-        std::string vol_name = ctx.GetVolumeName();
+        context = new context_t(disk_image);
+        std::string vol_name = context->GetVolumeName();
         if (IsValidName(vol_name) == false) {
             fprintf(stderr, "prodosfs: invalid ProDOS volume name -- \"%s\"\n", vol_name.c_str());
             return false;

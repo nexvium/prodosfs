@@ -4,19 +4,20 @@
 ** Copyright 2024 by Javier Alvarado.
 */
 
-#ifndef PRODOSFS_SYSTEM_HXX
-#define PRODOSFS_SYSTEM_HXX
+#ifndef PRODOSFS_CONTEXT_HXX
+#define PRODOSFS_CONTEXT_HXX
 
 #include "prodos/directory.hxx"
 #include "prodos/disk.hxx"
 #include "prodos/entry.hxx"
 #include "prodos/file.hxx"
 
-//#include <string>
-
 namespace prodos
 {
 
+/*
+** ProDOS error codes. Not all errors may be defined, just the ones this software may encounter and report.
+*/
 enum err_t
 {
     err_none                        = 0x00,
@@ -50,7 +51,9 @@ enum storage_type_t
     storage_type_volume_block   = 0xF,
 };
 
-
+/*
+** The context encapsulates an "on-line" ProDOS volume.
+*/
 class context_t
 {
 public:
@@ -71,12 +74,19 @@ public:
 
     file_handle_t *         OpenFile(const std::string & pathname) const;
 
+    // Gets the block specified in the index, EXCEPT when the index is 0,
+    // in which case it returns a block containing only zeros. This is used
+    // when reading sparse files.
+    //
+    // Block 0 is supposed to contains the ProDOS boot loader, not user data,
+    // so it should not be necessary to read the real block.
     const void *            GetBlock(int index) const;
     int                     GetBlocksUsed(const entry_t * entry) const;
 
     int                     CountVolumeBlocksUsed()         const;
     int                     CountVolumeDirectoryBlocks()    const;
 
+    // Return the last ProDOS error that occurred in the calling thread.
     static err_t            Error();
 
 private:
@@ -88,4 +98,4 @@ private:
 
 } // namespace
 
-#endif // PRODOSFS_SYSTEM_HXX
+#endif // PRODOSFS_CONTEXT_HXX

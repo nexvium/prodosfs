@@ -16,8 +16,12 @@
 
 namespace prodos
 {
+
 const int   BLOCK_SIZE          =  512;
+const int   FILENAME_LENGTH     =   15;
+const int   ENTRY_LENGTH        =   39;
 const int   ENTRIES_PER_BLOCK   =   13;
+const int   DATE_TIME_LENGTH    =    4;
 
 /*
 ** The directory header is the first entry in a volume or subdirectory key block
@@ -77,8 +81,8 @@ struct directory_entry
 
 /*
 ** A directory block describes the contents of a directory.  The first entry in a key block
-** (i.e. the first block for the directory) is a header.  All subsequent entries are
-** directory entries.
+** (i.e. the first block for the directory) is a directory header.  All subsequent entries
+** are directory entries.
 */
 struct directory_block
 {

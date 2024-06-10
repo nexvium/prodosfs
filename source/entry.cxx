@@ -6,7 +6,7 @@
 
 #include "prodos/entry.hxx"
 
-#include "prodos/context.hxx"
+#include "prodos/volume.hxx"
 #include "prodos/util.hxx"
 
 #include <stdexcept>

@@ -4,7 +4,7 @@
 ** Copyright 2024 by Javier Alvarado.
 */
 
-#include "prodos/context.hxx"
+#include "prodos/volume.hxx"
 
 #include "prodos/block.hxx"
 #include "prodos/util.hxx"
@@ -105,7 +105,7 @@ S_Deobfuscate(const void *src_blk, void * dst_blk)
     LOG(LOG_DEBUG1, "disk is not protected with password");
 }
 
-context_t::context_t(const std::string & pathname)
+volume_t::volume_t(const std::string & pathname)
     : _disk(pathname)
 {
     _root = _GetVolumeDirectoryBlock();
@@ -129,13 +129,19 @@ context_t::context_t(const std::string & pathname)
 }
 
 err_t
-context_t::Error()
+volume_t::Error()
 {
     return error;
 }
 
+void
+volume_t::ClearError()
+{
+    error = err_none;
+}
+
 const directory_block *
-context_t::_GetVolumeDirectoryBlock()
+volume_t::_GetVolumeDirectoryBlock()
 {
     const void *    block   = _disk.ReadBlock(2);
 
@@ -163,10 +169,24 @@ context_t::_GetVolumeDirectoryBlock()
 }
 
 std::string
-context_t::GetVolumeName() const
+volume_t::Name() const
 {
     auto volume = volume_header_t::Create(&_root->key.header);
     return volume->FileName();
+}
+
+int
+volume_t::FileCount() const
+{
+    auto volume = volume_header_t::Create(&_root->key.header);
+    return volume->FileCount();
+}
+
+int
+volume_t::TotalBlocks() const
+{
+    auto volume = volume_header_t::Create(&_root->key.header);
+    return volume->TotalBlocks();
 }
 
 static strings_t
@@ -186,7 +206,7 @@ S_SplitPath(const std::string & pathname)
 }
 
 const entry_t *
-context_t::GetEntry(const std::string & pathname) const
+volume_t::GetEntry(const std::string & pathname) const
 {
     if (pathname == "/") {
         return (entry_t *)&_root->key.header;
@@ -223,7 +243,7 @@ context_t::GetEntry(const std::string & pathname) const
 }
 
 file_handle_t *
-context_t::OpenFile(const std::string & pathname) const
+volume_t::OpenFile(const std::string & pathname) const
 {
     auto entry = GetEntry(pathname);
     if (entry == nullptr) {
@@ -238,7 +258,7 @@ context_t::OpenFile(const std::string & pathname) const
 }
 
 directory_handle_t *
-context_t::OpenDirectory(const std::string & pathname) const
+volume_t::OpenDirectory(const std::string & pathname) const
 {
     if (pathname == "/") {
         return new directory_handle_t(this, _root);
@@ -262,29 +282,14 @@ context_t::OpenDirectory(const std::string & pathname) const
 }
 
 const void *
-context_t::GetBlock(int index) const
+volume_t::GetBlock(int index) const
 {
     static uint8_t sparse_block[BLOCK_SIZE] = {};
     return index ? _disk.ReadBlock(index) : sparse_block;
 }
 
 int
-context_t::GetBlocksUsed(const entry_t *entry) const
-{
-    if (entry->IsFile() || entry->IsDirectory()) {
-        auto file = (const directory_entry_t *)entry;
-        return file->BlocksUsed();
-    }
-
-    if (entry->IsHeader()) {
-
-    }
-
-    throw std::runtime_error("expected storage type");
-}
-
-int
-context_t::CountVolumeBlocksUsed() const
+volume_t::CountBlocksUsed() const
 {
     uint16_t pointer = LE_Read16(_root->key.header.bit_map_pointer);
     auto blocks = _disk.NumBlocks();
@@ -302,7 +307,7 @@ context_t::CountVolumeBlocksUsed() const
 }
 
 int
-context_t::CountVolumeDirectoryBlocks() const
+volume_t::CountRootDirectoryBlocks() const
 {
     int num_blocks = 1;
 

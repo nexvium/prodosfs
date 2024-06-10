@@ -35,8 +35,6 @@ enum err_t
     err_file_access_error           = 0x4E,
     err_directory_structure_damaged = 0x51,
     err_file_structure_damaged      = 0x54,
-
-    err_prodosfs_not_a_directory    = 0xFF,
 };
 
 enum storage_type_t
@@ -52,21 +50,21 @@ enum storage_type_t
 };
 
 /*
-** The context encapsulates an "on-line" ProDOS volume.
+** The volume encapsulates an "on-line" (mounted) ProDOS volume.
 */
-class context_t
+class volume_t
 {
 public:
-    explicit context_t(const std::string & pathname);
-    context_t(const context_t &)                = delete;
-    context_t(const context_t &&)               = delete;
+    explicit volume_t(const std::string & pathname);
+    volume_t(const volume_t &)                = delete;
+    ~volume_t()                               = default;
 
-    ~context_t()                                = default;
-
-    std::string             GetVolumeName() const;
+    std::string     Name()          const;
+    int             FileCount()     const;
+    int             TotalBlocks()   const;
 
     // Returns the directory entry for the given pathname, if found,
-    // EXCEPT when the pathname is "/", in which case the volume
+    // EXCEPT when the pathname is "/", in which case the root
     // directory header is returned.
     const entry_t *         GetEntry(const std::string & pathname) const;
 
@@ -78,16 +76,17 @@ public:
     // in which case it returns a block containing only zeros. This is used
     // when reading sparse files.
     //
-    // Block 0 is supposed to contains the ProDOS boot loader, not user data,
+    // Block 0 is supposed to contains the ProDOS bootloader, not user data,
     // so it should not be necessary to read the real block.
-    const void *            GetBlock(int index) const;
-    int                     GetBlocksUsed(const entry_t * entry) const;
+    const void *    GetBlock(int index) const;
 
-    int                     CountVolumeBlocksUsed()         const;
-    int                     CountVolumeDirectoryBlocks()    const;
+    // These are not stored as data fields, so they really have to be counted.
+    int     CountBlocksUsed()           const;
+    int     CountRootDirectoryBlocks()  const;
 
-    // Return the last ProDOS error that occurred in the calling thread.
+    // Return or clear the last ProDOS error that occurred in the calling thread.
     static err_t            Error();
+    static void             ClearError();
 
 private:
     disk_t                      _disk;

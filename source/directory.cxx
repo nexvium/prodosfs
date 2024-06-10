@@ -6,7 +6,7 @@
 
 #include "prodos/directory.hxx"
 
-#include "prodos/context.hxx"
+#include "prodos/volume.hxx"
 #include "prodos/util.hxx"
 
 #include <stdexcept>
@@ -16,7 +16,7 @@ namespace prodos
 
 extern thread_local err_t error;
 
-directory_handle_t::directory_handle_t(const context_t * context, const directory_block * key_block)
+directory_handle_t::directory_handle_t(const volume_t * context, const directory_block * key_block)
     : _context(context), _header(nullptr), _block(nullptr), _block_index(1), _entry_index(0)
 {
     _Open(key_block);

@@ -13,7 +13,7 @@ namespace prodos
 struct directory_block;
 struct directory_header;
 
-class context_t;
+class volume_t;
 class disk_t;
 class directory_entry_t;
 
@@ -24,15 +24,15 @@ public:
     const directory_entry_t *   NextEntry();
 
 private:
-    const context_t *           _context;
+    const volume_t *            _context;
     const directory_header *    _header;
     const directory_block *     _block;
     int                         _block_index;
     int                         _entry_index;
 
-    friend class context_t;
+    friend class volume_t;
 
-    directory_handle_t(const context_t * context, const directory_block * key_block);
+    directory_handle_t(const volume_t * context, const directory_block * key_block);
 
     void    _Open(const directory_block * key_block);
     void    _Next();

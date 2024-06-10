@@ -6,7 +6,7 @@
 
 #include "prodos/file.hxx"
 
-#include "prodos/context.hxx"
+#include "prodos/volume.hxx"
 #include "prodos/util.hxx"
 
 #include <stdexcept>
@@ -29,7 +29,7 @@ index_block_t::At(int index) const
     return block->hi[index] << 8 | block->lo[index];
 }
 
-file_handle_t::file_handle_t(const context_t *context, const directory_entry_t *entry)
+file_handle_t::file_handle_t(const volume_t *context, const directory_entry_t *entry)
     : _context(context), _entry(entry)
 {
     switch (entry->StorageType()) {

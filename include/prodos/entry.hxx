@@ -14,7 +14,7 @@
 namespace prodos
 {
 
-class context_t;
+class volume_t;
 
 inline bool AXS_READ(uint8_t access)        { return access & 0b0000'0001; }
 inline bool AXS_WRITE(uint8_t access)       { return access & 0b0000'0010; }

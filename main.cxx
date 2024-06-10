@@ -26,7 +26,7 @@ static bool         foreground = false;
 static bool         use_name  = false;
 static int          log_level = LOG_INFO;
 static bool         debug = false;
-static context_t *  context = nullptr;
+static volume_t *   volume = nullptr;
 
 typedef std::unordered_map<std::string, std::string>    attributes_t;
 
@@ -146,11 +146,10 @@ static attributes_t S_GetAttributes(const entry_t * entry)
         }
     }
     else if (entry->IsRoot()) {
-        auto volume = (const volume_header_t *)entry;
-        attributes[XATTR("volume_name")] = volume->FileName();
+        attributes[XATTR("volume_name")] = volume->Name();
         attributes[XATTR("file_count")] = std::to_string(volume->FileCount());
         attributes[XATTR("total_blocks")] = std::to_string(volume->TotalBlocks());
-        attributes[XATTR("used_blocks")] = std::to_string(context->CountVolumeBlocksUsed());
+        attributes[XATTR("used_blocks")] = std::to_string(volume->CountBlocksUsed());
         attributes[XATTR("image_file")] = disk_image;
     }
     else {
@@ -168,9 +167,9 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p)", path, st);
 
-    auto entry = context->GetEntry(path);
+    auto entry = volume->GetEntry(path);
     if (entry == nullptr) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     st->st_nlink = 1;
@@ -184,7 +183,7 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     st->st_ctim.tv_sec = S_ToUnixTime(entry->CreationTimestamp());
 
     if (entry->IsRoot()) {
-        st->st_blocks = context->CountVolumeDirectoryBlocks();
+        st->st_blocks = volume->CountRootDirectoryBlocks();
         st->st_size = st->st_blocks * st->st_blksize;
         st->st_mode |= S_IFDIR | S_IXUSR | S_IXGRP;
 
@@ -209,9 +208,9 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
 
-    auto fh = context->OpenFile(path);
+    auto fh = volume->OpenFile(path);
     if (fh == nullptr) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(fh);
@@ -226,12 +225,12 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     auto pos = fh->Seek(off, SEEK_SET);
     if (pos < 0) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     size_t n = fh->Read(buf, bufsiz);
     if (n == 0 && fh->Eof() == false) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     if (text_mode == text_mode_unix && fh->Type() == file_type_text) {
@@ -262,9 +261,9 @@ static int prodosfs_getxattr(const char *path, const char *name, char *value, si
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_getxattr(\"%s\", \"%s\", %p, %zd)", path, name, value, size);
 
-    auto entry = context->GetEntry(path);
+    auto entry = volume->GetEntry(path);
     if (entry == nullptr) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     auto attributes = S_GetAttributes(entry);
@@ -289,9 +288,9 @@ static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p, %zd)", path, buffer, size);
 
-    auto entry = context->GetEntry(path);
+    auto entry = volume->GetEntry(path);
     if (entry == nullptr) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     char *  position = buffer;
@@ -325,25 +324,25 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
         S_LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);
     }
     else {
-        S_LogMessage(LOG_INFO, "mounted volume: %s", context->GetVolumeName().c_str());
+        S_LogMessage(LOG_INFO, "mounted volume: %s", volume->Name().c_str());
     }
 
-    return context;
+    return volume;
 }
 
 static void prodosfs_umount(void *private_data)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_umount(%p)", private_data);
 
-    auto ctx = (context_t *)private_data;
-    auto volume_name = ctx->GetVolumeName();
+    auto ctx = (volume_t *)private_data;
+    auto volume_name = ctx->Name();
     delete ctx;
 
     if (mount_dir) {
         S_LogMessage(LOG_INFO, "unmounted %s in %s", disk_image, mount_dir);
     }
     else {
-        S_LogMessage(LOG_INFO, "unmounted volume: %s", context->GetVolumeName().c_str());
+        S_LogMessage(LOG_INFO, "unmounted volume: %s", volume->Name().c_str());
     }
 }
 
@@ -351,9 +350,9 @@ static int prodosfs_opendir(const char *path, struct fuse_file_info *fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_opendir(\"%s\", %p)", path, fi);
 
-    auto dh = context->OpenDirectory(path);
+    auto dh = volume->OpenDirectory(path);
     if (dh == nullptr) {
-        return -S_ToError(context_t::Error());
+        return -S_ToError(volume_t::Error());
     }
 
     fi->fh = reinterpret_cast<uintptr_t>(dh);
@@ -380,8 +379,8 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         }
     }
 
-    if (context_t::Error() != err_end_of_file) {
-        return -S_ToError(context_t::Error());
+    if (volume_t::Error() != err_end_of_file) {
+        return -S_ToError(volume_t::Error());
     }
 
     return 0;
@@ -421,7 +420,7 @@ bool S_UpdateMountDirectory()
 {
     size_t path_len = strlen(mount_dir);
 
-    std::string vol_name = context->GetVolumeName();
+    std::string vol_name = volume->Name();
     if (IsValidName(vol_name) == false) {
         fprintf(stderr, "prodosfs: invalid ProDOS volume name -- \"%s\"\n", vol_name.c_str());
         return false;
@@ -504,7 +503,7 @@ int main(int argc, char *argv[])
     SetLogger(S_LogMessage);
 
     try {
-        context = new context_t(disk_image);
+        volume = new volume_t(disk_image);
     }
     catch (std::exception & e) {
         fprintf(stderr, "prodosfs: %s -- %s\n", e.what(), disk_image);

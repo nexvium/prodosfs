@@ -13,7 +13,7 @@
 namespace prodos
 {
 
-class context_t;
+class volume_t;
 class directory_entry_t;
 
 class index_block_t
@@ -33,16 +33,16 @@ public:
     size_t              Read(void *buffer, size_t size);
 
 private:
-    const context_t *           _context{};
+    const volume_t *            _context{};
     const directory_entry_t *   _entry{};
     index_block_t *             _master{};
     index_block_t *             _index{};
     uint8_t *                   _data{};
     off_t                       _position{};
 
-    file_handle_t(const context_t * context, const directory_entry_t * entry);
+    file_handle_t(const volume_t * context, const directory_entry_t * entry);
 
-    friend class context_t;
+    friend class volume_t;
 };
 
 } // namespace

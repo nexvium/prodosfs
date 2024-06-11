@@ -101,8 +101,6 @@ S_Deobfuscate(const void *src_blk, void * dst_blk)
     if (S_IsVolumeDirectoryBlock(plain)) {
         return;
     }
-
-    LOG(LOG_DEBUG1, "disk is not protected with password");
 }
 
 volume_t::volume_t(const std::string & pathname)

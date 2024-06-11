@@ -8,13 +8,15 @@
 
 #include "prodos.hxx"
 
+#include <fuse.h>
+
+#include <filesystem>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
-#include <fuse.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -23,8 +25,9 @@ using namespace prodos;
 static char *       mount_dir = nullptr;
 static char *       disk_image = nullptr;
 static bool         foreground = false;
-static bool         use_name  = false;
+static bool         use_name = false;
 static int          log_level = LOG_INFO;
+static int          log_fd = 0;
 static bool         debug = false;
 static volume_t *   volume = nullptr;
 
@@ -157,6 +160,12 @@ static attributes_t S_GetAttributes(const entry_t * entry)
     }
 
     return attributes;
+}
+
+static void S_Cleanup()
+{
+    S_LogMessage(LOG_INFO, "removing %s", mount_dir);
+    rmdir(mount_dir);
 }
 
 //================================================================================================
@@ -318,6 +327,25 @@ static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 
 static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
+    if (log_fd > 0) {
+        auto pid = fork();
+        if (pid < 0) {
+            fprintf(stderr, "prodosfs: unable to fork\n");
+            exit(EXIT_FAILURE);
+        }
+        else if (pid > 0) {
+            printf("prodosfs: mounted %s in %s\n", disk_image, mount_dir);
+            exit(EXIT_SUCCESS);
+        }
+
+        if (use_name) {
+            atexit(S_Cleanup);
+        }
+
+        dup2(log_fd, STDOUT_FILENO);
+        dup2(log_fd, STDERR_FILENO);
+    }
+
     S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
     if (mount_dir) {
@@ -416,6 +444,20 @@ static struct fuse_operations operations =
 // Main
 //------------------------------------------------------------------------------------------------
 
+static bool S_RedirectToLogfile()
+{
+    auto name = std::filesystem::path(disk_image).stem();
+    auto log_file = std::string("/tmp/") + name.string() + ".log";
+
+    log_fd = open(log_file.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0660);
+    if (log_fd < 0) {
+        fprintf(stderr, "prodosfs: unable to open log file -- %s\n", log_file.c_str());
+        return false;
+    }
+
+    return true;
+}
+
 bool S_UpdateMountDirectory()
 {
     size_t path_len = strlen(mount_dir);
@@ -510,16 +552,20 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    bool cleanup = false;
     if (use_name == true) {
         if (S_UpdateMountDirectory() == false) {
             return EXIT_FAILURE;
         }
 
         // WARNING! does not do all checks mount should do
-        cleanup = true;
         if (mkdir(mount_dir, 0777)) {
             fprintf(stderr, "prodosfs: unable to create mount directory -- %s\n", mount_dir);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (foreground == false && debug == false) {
+        if (S_RedirectToLogfile() == false) {
             return EXIT_FAILURE;
         }
     }
@@ -528,11 +574,10 @@ int main(int argc, char *argv[])
     fuse_args args = FUSE_ARGS_INIT(0, nullptr);
     fuse_opt_add_arg(&args, "prodosfs");
     fuse_opt_add_arg(&args, "-oauto_unmount");
-    if (foreground) {
-        fuse_opt_add_arg(&args, "-f");
-    }
+    fuse_opt_add_arg(&args, "-f");
     if (debug) {
         fuse_opt_add_arg(&args, "-d");
+        log_level = LOG_MAX;
     }
     fuse_opt_add_arg(&args, mount_dir);
 
@@ -540,10 +585,6 @@ int main(int argc, char *argv[])
     int rv = fuse_main(args.argc, args.argv, &operations, nullptr);
 
     fuse_opt_free_args(&args);
-    if (cleanup) {
-        rmdir(mount_dir);
-    }
-
     free(disk_image);
     free(mount_dir);
 

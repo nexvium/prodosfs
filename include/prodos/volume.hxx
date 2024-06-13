@@ -88,6 +88,9 @@ public:
     static err_t            Error();
     static void             ClearError();
 
+    // Return a directory listing formated like ProDOS's CATALOG command.
+    std::string *     Catalog(const std::string & pathname) const;
+
 private:
     disk_t                      _disk;
     const directory_block *     _root;

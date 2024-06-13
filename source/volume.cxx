@@ -7,9 +7,11 @@
 #include "prodos/volume.hxx"
 
 #include "prodos/block.hxx"
-#include "prodos/util.hxx"
 #include "prodos/directory.hxx"
+#include "prodos/filetype.hxx"
+#include "prodos/util.hxx"
 
+#include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -318,6 +320,57 @@ volume_t::CountRootDirectoryBlocks() const
     }
 
     return num_blocks;
+}
+
+std::string *
+volume_t::Catalog(const std::string & pathname) const
+{
+    auto pathdir = std::filesystem::path(pathname).parent_path();
+    auto dh = OpenDirectory(pathdir);
+    if (dh == nullptr) {
+        return nullptr;
+    }
+
+    auto output = new std::string();
+
+    char line[128] = {};
+    sprintf(line, "%s\n\n", pathdir.c_str());
+    output->append(line);
+
+    sprintf(line, " %-15s  %4s  %7s  %-19s  %-19s  %8s  %7s\n\n",
+                  "NAME", "TYPE", "BLOCKS", "MODIFIED", "CREATED", "ENDFILE", "SUBTYPE");
+    output->append(line);
+
+    const directory_entry_t * entry = nullptr;
+    while ((entry = dh->NextEntry()) != nullptr) {
+        char subtype[16] = {};
+        switch (entry->FileType()) {
+            case 0x06:
+                sprintf(subtype, "A=$%04X", entry->AuxType());
+            default:
+                subtype[0] = 0;
+        }
+        sprintf(line, " %-15s  %4s  %7d  %-19s  %-19s  %8d  %7s\n",
+                entry->FileName().c_str(),
+                GetFileTypeInfo(entry->FileType())->name.c_str(),
+                entry->BlocksUsed(),
+                entry->LastModTimestamp().AsString().c_str(),
+                entry->CreationTimestamp().AsString().c_str(),
+                entry->Eof(),
+                subtype);
+        output->append(line);
+    }
+
+    auto total_blocks = TotalBlocks();
+    auto blocks_used = CountBlocksUsed();
+    sprintf(line, "\nBLOCKS FREE: %4d    BLOCKS USED: %4d    TOTAL BLOCKS: %4d\n",
+                  total_blocks - blocks_used, blocks_used, total_blocks);
+    output->append(line);
+
+    dh->Close();
+    delete dh;
+
+    return output;
 }
 
 } // namespace

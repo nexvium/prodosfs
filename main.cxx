@@ -41,6 +41,26 @@ enum text_mode_t
 
 static text_mode_t text_mode = text_mode_unix;
 
+enum pseudo_file_mode_t
+{
+    pseudo_file_mode_none,
+    pseudo_file_mode_hidden,
+    pseudo_file_mode_visible,
+};
+
+static pseudo_file_mode_t pseudo_file_mode = pseudo_file_mode_hidden;
+
+enum pseudo_file_id_t
+{
+    pseudo_file_id_none,
+    pseudo_file_id_catalog
+};
+
+static std::unordered_map<std::string, pseudo_file_id_t> pseudo_files
+{
+    { ".CATALOG", pseudo_file_id_catalog },
+};
+
 //================================================================================================
 // Helper functions
 //------------------------------------------------------------------------------------------------
@@ -162,6 +182,17 @@ static attributes_t S_GetAttributes(const entry_t * entry)
     return attributes;
 }
 
+static pseudo_file_id_t S_PseudoFileId(const std::string & pathanme)
+{
+    auto filename = std::filesystem::path(pathanme).filename();
+    auto pseudo_file = pseudo_files.find(filename);
+    if (pseudo_file == pseudo_files.end()) {
+        return pseudo_file_id_none;
+    }
+
+    return pseudo_file->second;
+}
+
 static void S_Cleanup()
 {
     S_LogMessage(LOG_INFO, "removing %s", mount_dir);
@@ -172,9 +203,20 @@ static void S_Cleanup()
 // FUSE operations
 //------------------------------------------------------------------------------------------------
 
-static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *)
+static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *fi)
 {
-    S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p)", path, st);
+    S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p, %p)", path, st, fi);
+
+    if (pseudo_file_mode != pseudo_file_mode_none) {
+        auto id = S_PseudoFileId(path);
+        if (id != pseudo_file_id_none) {
+            st->st_uid = getuid();
+            st->st_gid = getgid();
+            st->st_mode = S_IFREG | S_IRUSR | S_IRGRP;
+            st->st_size = FILE_SIZE_MAX;
+            return 0;
+        }
+    }
 
     auto entry = volume->GetEntry(path);
     if (entry == nullptr) {
@@ -217,6 +259,18 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
 
+    if (pseudo_file_mode != pseudo_file_mode_none) {
+        auto id = S_PseudoFileId(path);
+        if (id == pseudo_file_id_catalog) {
+            auto catalog = volume->Catalog(path);
+            fi->fh = reinterpret_cast<uintptr_t>(catalog);
+            return 0;
+        }
+        else if (id != pseudo_file_id_none) {
+            throw std::logic_error("unexpected pseudo file id");
+        }
+    }
+
     auto fh = volume->OpenFile(path);
     if (fh == nullptr) {
         return -S_ToError(volume_t::Error());
@@ -230,6 +284,14 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, struct fuse_file_info * fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %zd, %p)", path, off, fi);
+
+    if (pseudo_file_mode != pseudo_file_mode_none) {
+        auto id = S_PseudoFileId(path);
+        if (id != pseudo_file_id_none) {
+            auto data = reinterpret_cast<std::string *>(fi->fh);
+            return (int)data->copy(buf, bufsiz, off);
+        }
+    }
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     auto pos = fh->Seek(off, SEEK_SET);
@@ -258,6 +320,15 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
 static int prodosfs_close(const char *path, struct fuse_file_info *fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_close(\"%s\", %p)", path, fi);
+
+    if (pseudo_file_mode != pseudo_file_mode_none) {
+        auto id = S_PseudoFileId(path);
+        if (id != pseudo_file_id_none) {
+            auto data = reinterpret_cast<std::string *>(fi->fh);
+            delete data;
+            return 0;
+        }
+    }
 
     auto fh = reinterpret_cast<file_handle_t *>(fi->fh);
     fh->Close();

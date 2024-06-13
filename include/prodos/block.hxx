@@ -17,11 +17,12 @@
 namespace prodos
 {
 
-const int   BLOCK_SIZE          =  512;
-const int   FILENAME_LENGTH     =   15;
-const int   ENTRY_LENGTH        =   39;
-const int   ENTRIES_PER_BLOCK   =   13;
-const int   DATE_TIME_LENGTH    =    4;
+const int   BLOCK_SIZE          =      512;
+const int   FILENAME_LENGTH     =       15;
+const int   ENTRY_LENGTH        =       39;
+const int   ENTRIES_PER_BLOCK   =       13;
+const int   DATE_TIME_LENGTH    =        4;
+const int   FILE_SIZE_MAX       = 0xFFFFFF;
 
 /*
 ** The directory header is the first entry in a volume or subdirectory key block

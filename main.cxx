@@ -113,12 +113,12 @@ static time_t S_ToUnixTime(const timestamp_t & timestamp)
 
 static std::string S_AccessToString(uint8_t access)
 {
-    std::vector<std::string>    allowed;
-    if (AXS_READ(access))       allowed.emplace_back("READ");
-    if (AXS_WRITE(access))      allowed.emplace_back("WRITE");
-    if (AXS_BACKUP(access))     allowed.emplace_back("BACKUP");
-    if (AXS_RENAME(access))     allowed.emplace_back("RENAME");
-    if (AXS_DESTROY(access))    allowed.emplace_back("DESTROY");
+    std::vector<std::string>     allowed;
+    if (ACCESS_READ(access))     allowed.emplace_back("READ");
+    if (ACCESS_WRITE(access))    allowed.emplace_back("WRITE");
+    if (ACCESS_BACKUP(access))   allowed.emplace_back("BACKUP");
+    if (ACCESS_RENAME(access))   allowed.emplace_back("RENAME");
+    if (ACCESS_DESTROY(access))  allowed.emplace_back("DESTROY");
 
     // Would be nice if the STL provided a join function.
     std::string str;

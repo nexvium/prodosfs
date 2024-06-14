@@ -62,11 +62,11 @@ timestamp_t::AsString() const
                                      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
     if (month < 1 || month > 12) {
-        return { "00-XXX-00 00:00 AM" };
+        return { "" };
     }
 
-    sprintf(buffer, "%02d-%3s-%02d %02d:%02d %s",
-                    day, months[month - 1], year, hour, minute, hour < 12 ? "AM" : "PM");
+    sprintf(buffer, "%02d-%3s-%02d %02d:%02d",
+                    day, months[month - 1], year, hour, minute, hour);
 
     return { buffer };
 }

@@ -195,6 +195,7 @@ static pseudo_file_id_t S_PseudoFileId(const std::string & pathanme)
 
 static void S_Cleanup()
 {
+    // mount_dir must still be valid after main() exits
     S_LogMessage(LOG_INFO, "removing %s", mount_dir);
     rmdir(mount_dir);
 }
@@ -416,6 +417,7 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
     S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
 
     if (use_name) {
+        S_LogMessage(LOG_INFO, "created %s", mount_dir);
         atexit(S_Cleanup);
     }
 
@@ -657,7 +659,6 @@ int main(int argc, char *argv[])
 
     fuse_opt_free_args(&args);
     free(disk_image);
-    free(mount_dir);
 
     return rv;
 }

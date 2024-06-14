@@ -211,9 +211,9 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     if (pseudo_file_mode != pseudo_file_mode_none) {
         auto id = S_PseudoFileId(path);
         if (id != pseudo_file_id_none) {
-            st->st_uid = getuid();
-            st->st_gid = getgid();
             st->st_mode = S_IFREG | S_IRUSR | S_IRGRP;
+            // The size is unknown, but it seems fuse won't call read()
+            // if the size is returned here is zero.
             st->st_size = FILE_SIZE_MAX;
             return 0;
         }
@@ -225,8 +225,6 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     }
 
     st->st_nlink = 1;
-    st->st_uid = getuid();
-    st->st_gid = getgid();
     st->st_blksize = BLOCK_SIZE;
     st->st_mode = S_IRUSR | S_IRGRP;
 
@@ -643,10 +641,17 @@ int main(int argc, char *argv[])
         }
     }
 
+    std::string opt_uid("-ouid=");
+    std::string opt_gid("-ogid=");
+    opt_uid.append(std::to_string(getuid()));
+    opt_gid.append(std::to_string(getgid()));
+
     // Build arguments vector for FUSE's main.
     fuse_args args = FUSE_ARGS_INIT(0, nullptr);
     fuse_opt_add_arg(&args, "prodosfs");
     fuse_opt_add_arg(&args, "-oauto_unmount");
+    fuse_opt_add_arg(&args, opt_uid.c_str());
+    fuse_opt_add_arg(&args, opt_gid.c_str());
     fuse_opt_add_arg(&args, "-f");
     if (debug) {
         fuse_opt_add_arg(&args, "-d");

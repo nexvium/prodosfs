@@ -15,6 +15,8 @@ This software was written to allow to recovery of the author's 30+-year-old file
 
 Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are currently few protections against misuse, unintentional or otherwise.
 
+This is only intended for the ProDOS disks used on the 8-bit Apple II series (i.e. IIe, IIc, etc) _not_ ones used on the 16-bit Apple IIgs (ProDOS 16).
+
 # Build
 
 This is a cmake-based project. Building it should be as simple as:

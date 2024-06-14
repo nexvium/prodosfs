@@ -409,15 +409,15 @@ static void *prodosfs_mount(struct fuse_conn_info *conn, struct fuse_config *cfg
             exit(EXIT_SUCCESS);
         }
 
-        if (use_name) {
-            atexit(S_Cleanup);
-        }
-
         dup2(log_fd, STDOUT_FILENO);
         dup2(log_fd, STDERR_FILENO);
     }
 
     S_LogMessage(LOG_DEBUG1, "prodosfs_mount()");
+
+    if (use_name) {
+        atexit(S_Cleanup);
+    }
 
     if (mount_dir) {
         S_LogMessage(LOG_INFO, "mounted %s in %s", disk_image, mount_dir);

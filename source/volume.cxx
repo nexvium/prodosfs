@@ -334,7 +334,7 @@ volume_t::Catalog(const std::string & pathname) const
     auto output = new std::string();
 
     char line[128] = {};
-    sprintf(line, "\n%s\n\n", pathdir.c_str());
+    sprintf(line, "\n/%s%s\n\n", Name().c_str(), pathdir == "/" ? "" : pathdir.c_str());
     output->append(line);
 
     sprintf(line, " %-15s %4s  %6s  %-15s  %-15s  %7s  %7s\n\n",
@@ -344,9 +344,11 @@ volume_t::Catalog(const std::string & pathname) const
     const directory_entry_t * entry = nullptr;
     while ((entry = dh->NextEntry()) != nullptr) {
         char subtype[16] = {};
-        switch (entry->FileType()) {
-            case 0x06:
+        uint8_t type = entry->FileType();
+        switch (type) {
+            case file_type_binary:
                 sprintf(subtype, "A=$%04X", entry->AuxType());
+                break;
             default:
                 subtype[0] = 0;
         }

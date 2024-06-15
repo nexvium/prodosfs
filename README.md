@@ -13,9 +13,9 @@ prodosfs is a [FUSE](https://github.com/libfuse/libfuse) filesystem that allows 
 
 This software was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
 
-Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are currently few protections against misuse, unintentional or otherwise.
-
 This is only intended for the ProDOS disks used on the 8-bit Apple II series (i.e. IIe, IIc, etc) _not_ ones used on the 16-bit Apple IIgs (ProDOS 16).
+
+Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are few protections against misuse, unintentional or otherwise.
 
 # Build
 
@@ -31,7 +31,7 @@ $ cmake ..
 
 Two arguments are required: a mount directory and an image file path.
 
-A few options are currently supported:
+A few options are supported:
 
 * `-h` to output a usage message
 * `-f` to run in the foreground instead of backgrounding itself
@@ -51,7 +51,7 @@ The image contents are accessible until the `prodosfs` program exits, either due
 
 ## Extended attributes
 
-Many ProDOS filesystem properties that do not obviously map to similar POSIX properties (e.g. file creation date and time) are accessible as extended attributes in the `prodos` namespace. For example:
+Many ProDOS filesystem properties that do not obviously map to similar POSIX properties (e.g. file creation date and time) are accessible as extended attributes in a `prodos` namespace. For example:
 
 ```
 $ getfattr -d -m "prodos.*" IMPORTANT.ADRS
@@ -69,7 +69,7 @@ prodos.version="8"
 
 ## Pseudo-files
 
-The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG` in every directory, which can be read to view the directory contents in a similar format to the output of the ProdDOS `CATALOG` command:
+The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which exists implicitly in every directory. It can be read to view the directory contents in a similar format to the output of the ProdDOS `CATALOG` command:
 
 ```
 $ cat APPLEWORKS/.CATALOG
@@ -80,11 +80,11 @@ $ cat APPLEWORKS/.CATALOG
 
  PRODOS           SYS      34  02-NOV-90 12:31  21-MAR-92 00:00    16595         
  APLWORKS.SYSTEM  SYS      26  09-FEB-92 00:00  21-MAR-92 00:00    12683         
- SEG.00           BIN       9  03-AUG-89 15:59  21-MAR-92 00:00     3923  A=$0000
- SEG.AW           BIN      98  03-AUG-89 16:01  21-MAR-92 00:00    49220  A=$0000
- SEG.EL           BIN      12  27-DEC-88 09:52  21-MAR-92 00:00     5632  A=$0000
- SEG.ER           BIN       4  16-OCT-23 00:00  21-MAR-92 00:00     2134  A=$0000
- SEG.WP           BIN      88  03-AUG-89 16:01  21-MAR-92 00:00    44542  A=$0000
+ SEG.00           BIN       9  03-AUG-89 15:59  21-MAR-92 00:00     3923         
+ SEG.AW           BIN      98  03-AUG-89 16:01  21-MAR-92 00:00    49220         
+ SEG.EL           BIN      12  27-DEC-88 09:52  21-MAR-92 00:00     5632         
+ SEG.ER           BIN       4  16-OCT-23 00:00  21-MAR-92 00:00     2134         
+ SEG.WP           BIN      88  03-AUG-89 16:01  21-MAR-92 00:00    44542         
 
 BLOCKS FREE:    2          BLOCKS USED:  278          TOTAL BLOCKS:  280
 
@@ -92,14 +92,15 @@ BLOCKS FREE:    2          BLOCKS USED:  278          TOTAL BLOCKS:  280
 
 ## Utilities
 
-The `util/` directory contains small programs that may be useful for working with ProDOS files. Only one currently exists.
+The `util/` directory contains small programs that may be useful for working with ProDOS files. Two currently exist.
 
 * `awp2txt`: Convert an AppleWorks word processor file to text.
+* `unk2txt`: Convert some unknown word processor file to text.
 
 # To Do
 
 - [ ] Comment code
-- [ ] Mount as read-only
+- [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
 - [ ] Add option to disable ProDOS-to-Unix text file translation
 - [ ] Add option to control pseudo-files support
 - [ ] Write utility to de-tokenize Applesoft BASIC programs to text

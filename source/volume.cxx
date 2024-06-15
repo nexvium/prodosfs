@@ -347,7 +347,9 @@ volume_t::Catalog(const std::string & pathname) const
         uint8_t type = entry->FileType();
         switch (type) {
             case file_type_binary:
-                sprintf(subtype, "A=$%04X", entry->AuxType());
+                if (entry->AuxType() != 0) {
+                    sprintf(subtype, "A=$%04X", entry->AuxType());
+                }
                 break;
             default:
                 subtype[0] = 0;

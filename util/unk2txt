@@ -67,8 +67,8 @@ while (length($CONTENT) > 0) {
     $CONTENT =~ s/^(\x01...\x01)//s;
 
     my $command = $1;
-    my $text_end = index($CONTENT, "\x01") || length($CONTENT);
-    my $text = substr($CONTENT, 0, $text_end, '');
+    my $text_end = index($CONTENT, "\x01");
+    my $text = substr($CONTENT, 0, ($text_end > 0 ? $text_end : length $CONTENT), '');
 
     # convert carriage returns and tabs
     $text =~ s/\r/\n\n/g;

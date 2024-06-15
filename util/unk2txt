@@ -78,7 +78,7 @@ while (length($CONTENT) > 0) {
     do { } while ($text =~ s/\x00.//g);
 
     # again, no idea what these do here
-    do { } while ($text =~ s/[\x01-\x06\x0e-\x1f]//g);
+    do { } while ($text =~ s/[\x00-\x08\x0e-\x1f]//g);
 
     # best guess
     if (not defined($command) or $command eq "\x01\x00\x00\x00\x01") {

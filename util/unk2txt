@@ -56,8 +56,9 @@ if ($header !~ /^\x80\x19(?:\x01|\x37)\x00\x01\x00\x19\x01\x86\x19\x0a\x01\x14\x
 }
 
 # The text of all the documents begins with a title, which is preceded by a command.
-# Assume that command is for centering the title. Removing leading tabs and spaces
-# makes centering it easier.
+# Assume that command is for selecting the type face and/or size. Leading tabs and
+# spaces were used presumably to center the title. Removing them makes centering it
+# here easier.
 $CONTENT =~ s/^[\x09\x20]+//;
 
 # With all that removed, all that should be left is the actual body of the document.
@@ -88,7 +89,7 @@ while (length($CONTENT) > 0) {
         # this appears to be returning to normal (unstylized) text
         print $text;
     }
-    elsif ($command =~ /^\x01\x00\x00([\x01-\x03])\x01$/) {
+    elsif ($command =~ /^\x01[\x00\x03\x06][\x00\x10]([\x01-\x03])\x01$/) {
         # this appears to be a text styling bitmap
         my $style = ord $1;
         if ($style & 0x01) {
@@ -105,7 +106,7 @@ while (length($CONTENT) > 0) {
         # this is maybe a list item?
         print "* $C{bold_on}$text$C{bold_off}";
     }
-    elsif ($command eq "\x01\x00\x00\x10\x01") {
+    elsif ($command =~ /^\x01[\x00\x01]\x00\x10\x01$/) {
         # treat this as underlining command
         print "$C{under_on}$text$C{under_off}";
     }
@@ -113,14 +114,23 @@ while (length($CONTENT) > 0) {
         # this is maybe small caps text?
         print "$C{inverse_on}$text$C{inverse_off}";
     }
-    elsif ($command =~ /^\x01[\x01\x07\x08]\x00\x00\x01/) {
+    elsif ($command eq "\x01\x02\x02\x00\x01") {
+        # this is maybe changing the type font or size
+        $text =~ s/(.)/$1 /g;
+        print "$C{blink_on}$text$C{blink_off}";
+    }
+    elsif ($command =~ /^\x01[\x01\x07\x08]\x00\x00\x01$/) {
         # this always precedes the first line of text
-        # assume it's centering the title
+        # assume it's changing the type font or size for the title
+        # but just center it here
         print " " x (($WIDTH - length $text) / 2);
         print "$text";
     }
     else {
-        printf STDERR "$0: unexpected command -- %s\n", unpack("H*", $command);
+        no warnings 'once';
+        (my $hex = unpack("H*", $command)) =~ s/(..)/\\x$1/g;
+        printf STDERR "\n$0: unexpected command -- %s\n", $hex;
+        $DB::single=1;
         exit(1);
     }
 }
@@ -130,7 +140,7 @@ print "\n";
 exit 0;
 
 # highlight non-printing characters (i.e ASCII 0-31)
-sub debug_hilite_invisible
+sub hilite_invisible
 {
     my $text = substr($_[0], 0, 80);
     $text =~ s/([\x00-\x1f])/sprintf "$C{inverse_on}\\x%02X$C{inverse_off}",ord($1)/eg;

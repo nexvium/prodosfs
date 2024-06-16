@@ -92,14 +92,14 @@ BLOCKS FREE:    2          BLOCKS USED:  278          TOTAL BLOCKS:  280
 
 ## Utilities
 
-The `util/` directory contains small programs that may be useful for working with ProDOS files. Two currently exist.
+The `util/` directory contains small programs that may be useful for working with files on the mounted disks. Two currently exist.
 
 * `awp2txt`: Convert an AppleWorks word processor file to text.
 * `unk2txt`: Convert some unknown word processor file to text.
 
 # To Do
 
-- [ ] Comment code
+- [ ] Comment code more
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
 - [ ] Add option to disable ProDOS-to-Unix text file translation
 - [ ] Add option to control pseudo-files support

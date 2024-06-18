@@ -101,6 +101,7 @@ The `util/` directory contains small programs that may be useful for working wit
 
 - [ ] Comment code more
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
+- [ ] Add option to use file type as file extension
 - [ ] Add option to disable ProDOS-to-Unix text file translation
 - [ ] Add option to control pseudo-files support
 - [ ] Write utility to de-tokenize Applesoft BASIC programs to text

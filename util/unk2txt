@@ -16,7 +16,9 @@ my %COLOR = (
     italic_on    => "\e[3m",    italic_off    => "\e[23m",
     under_on     => "\e[4m",    under_off     => "\e[24m",
     blink_on     => "\e[5m",    blink_off     => "\e[25m",
+    blink2_on    => "\e[6m",    blink2_off    => "\e[26m",
     inverse_on   => "\e[7m",    inverse_off   => "\e[27m",
+    invisible_on => "\e[8m",    invisible_off => "\e[28m",
     strikeout_on => "\e[9m",    strikeout_off => "\e[29m",
 );
 my %PLAIN = (
@@ -25,11 +27,14 @@ my %PLAIN = (
     italic_on    => "",     italic_off    => "",
     under_on     => "",     under_off     => "",
     blink_on     => "",     blink_off     => "",
+    blink2_on    => "",     blink2_off    => "",
     inverse_on   => "",     inverse_off   => "",
+    invisible_on => "",     invisible_off => "",
     strikeout_on => "",     strikeout_off => "",
 );
 my %C = %COLOR;
 my $WIDTH = $ENV{COLUMNS} || 120;
+my $DEBUGGING = 1;
 
 if (@ARGV < 1) {
     print STDERR "$0: no file specified\n";
@@ -62,11 +67,18 @@ if ($header !~ /^\x80\x19(?:\x01|\x37)\x00\x01\x00\x19\x01\x86\x19\x0a\x01\x14\x
 $CONTENT =~ s/^[\x09\x20]+//;
 
 # With all that removed, all that should be left is the actual body of the document.
+my @last_byte = ( 0, 0, 0 );
 while (length($CONTENT) > 0) {
     # no idea what the first byte means
-    $CONTENT =~ s/^([\x01\x02]...\x01)//s;
+    $CONTENT =~ s/^([\x01\x02](.)(.)(.)\x01)//s;
 
-    my $command = $1;
+    # after looking at several files, assuming the middle three bytes are
+    # selecting font face, size, and style
+    my $opcode       = $1;
+    my $face_or_size = $2;
+    my $size_or_face = $3;
+    my $style        = $4;
+
     my $text_end = index($CONTENT, "\x01");
     my $text = substr($CONTENT, 0, ($text_end > 0 ? $text_end : length $CONTENT), '');
 
@@ -80,59 +92,55 @@ while (length($CONTENT) > 0) {
     # again, no idea what these do here
     do { } while ($text =~ s/[\x00-\x08\x0e-\x1f]//g);
 
-    # best guess
-    if (not defined $command) {
-        # treat this as normal text
-        print $text;
-    }
-    elsif ($command =~ /^\x01\x00\x00\x00\x01$/) {
-        # this appears to be returning to normal (unstylized) text
-        print $text;
-    }
-    elsif ($command =~ /^\x01[\x00\x03\x06][\x00\x10]([\x01-\x03])\x01$/) {
-        # this appears to be a text styling bitmap
-        my $style = ord $1;
-        if ($style & 0x01) {
+    # try to do something sensible with the formatting command
+    # if debugging is enabled, output the codes that are changing
+    # to try to help figure our what they may be doing
+    if ($opcode) {
+        my $lead = "";
+
+        my $byte = ord $face_or_size;
+        if ($DEBUGGING) {
+            $lead .= $byte == 0  || $byte == $last_byte[0]
+                        ? "." : sprintf("\\x%02X", $byte);
+            $last_byte[0] = $byte;
+        }
+
+        $byte = ord $size_or_face;
+        if ($DEBUGGING) {
+            $lead .= $byte == 0 || $byte == $last_byte[1]
+                        ? "." : sprintf("\\x%02X", $byte);
+            $last_byte[1] = $byte;
+        }
+
+        $byte = ord $style;
+        if ($byte & 0x01) {
             # assume this is bolding
             $text = "$C{bold_on}$text$C{bold_off}";
+            $byte &= ~0x01;
         }
-        if ($style & 0x02) {
+        if ($byte & 0x02) {
             # assume this is italicizing
             $text = "$C{italic_on}$text$C{italic_off}";
+            $byte &= ~0x02;
         }
-        print $text;
+        if ($byte & 0x10) {
+            # assume this is underlining
+            $text = "$C{under_on}$text$C{under_off}";
+            $byte &= ~0x10;
+        }
+        if ($DEBUGGING) {
+            $lead .= $byte == 0 || $byte == $last_byte[2]
+                        ? "." : sprintf("\\x%02X", $byte);
+            $last_byte[2] = $byte;
+        }
+
+        if ($DEBUGGING) {
+            $lead = "" if ($lead eq '...');
+            print "$C{faint_on}\[$lead\]$C{faint_off}";
+        }
     }
-    elsif ($command eq "\x01\x00\x00\x04\x01") {
-        # this is maybe a list item?
-        print "* $C{bold_on}$text$C{bold_off}";
-    }
-    elsif ($command =~ /^\x01[\x00\x01]\x00\x10\x01$/) {
-        # treat this as underlining command
-        print "$C{under_on}$text$C{under_off}";
-    }
-    elsif ($command eq "\x01\x02\x00\x00\x01") {
-        # this is maybe small caps text?
-        print "$C{inverse_on}$text$C{inverse_off}";
-    }
-    elsif ($command eq "\x01\x02\x02\x00\x01") {
-        # this is maybe changing the type font or size
-        $text =~ s/(.)/$1 /g;
-        print "$C{blink_on}$text$C{blink_off}";
-    }
-    elsif ($command =~ /^\x01[\x01\x07\x08]\x00\x00\x01$/) {
-        # this always precedes the first line of text
-        # assume it's changing the type font or size for the title
-        # but just center it here
-        print " " x (($WIDTH - length $text) / 2);
-        print "$text";
-    }
-    else {
-        no warnings 'once';
-        (my $hex = unpack("H*", $command)) =~ s/(..)/\\x$1/g;
-        printf STDERR "\n$0: unexpected command -- %s\n", $hex;
-        $DB::single=1;
-        exit(1);
-    }
+
+    print $text;
 }
 
 print "\n";

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Unknown Word Processor to Text translator.
+# MultiScribe to Text translator.
 #
 use strict;
 use warnings;
@@ -52,33 +52,32 @@ open(FILE, '<', $ARGV[0])                       or die "$0: unable to open -- $!
 my $n = sysread(FILE, $CONTENT, $MAX_FILE_SIZE) or die "$0: unable to read -- $!\n";
 close(FILE)                                     or die "$0: unable to close -- $1\n";
 
-# Files all seem to begin with a 0x127-byte identical header. Only 1 of the 26 files
+# Files all seem to begin with a 0x100-byte identical header. Only 1 of the 26 files
 # differs, and only by one byte.
-my $header = substr($CONTENT, 0, 0x127, '');
-if ($header !~ /^\x80\x19(?:\x01|\x37)\x00\x01\x00\x19\x01\x86\x19\x0a\x01\x14\x14/) {
-    print STDERR "$0: does not appear to be an unknown word processor file\n";
+my $header = substr($CONTENT, 0, 0x100, '');
+if ($header !~ /^\x80\x19(?:.)\x00\x01\x00\x19\x01\x86\x19\x0a\x01\x14\x14/) {
+    print STDERR "$0: does not appear to be an multiscribe file\n";
     exit(1)
 }
 
-# The text of all the documents begins with a title, which is preceded by a command.
-# Assume that command is for selecting the type face and/or size. Leading tabs and
-# spaces were used presumably to center the title. Removing them makes centering it
-# here easier.
-$CONTENT =~ s/^[\x09\x20]+//;
+# Header is followed by 0x27 bytes which I believe set up margins and tab stops.
+# Ignoring these for now.
+substr($CONTENT, 0, 0x27, '');
 
 # With all that removed, all that should be left is the actual body of the document.
 my @last_byte = ( 0, 0, 0 );
 while (length($CONTENT) > 0) {
-    # no idea what the first byte means
+    # text is preceded by formatting code; no idea what the first byte means
     $CONTENT =~ s/^([\x01\x02](.)(.)(.)\x01)//s;
 
-    # after looking at several files, assuming the middle three bytes are
-    # selecting font face, size, and style
-    my $opcode       = $1;
-    my $face_or_size = $2;
-    my $size_or_face = $3;
-    my $style        = $4;
+    # the middle three bytes specify the font, size, and style
+    # for the text that follows
+    my $formatting  = $1;
+    my $font        = $2;
+    my $size        = $3;
+    my $style       = $4;
 
+    # extract text up until the next formatting code
     my $text_end = index($CONTENT, "\x01");
     my $text = substr($CONTENT, 0, ($text_end > 0 ? $text_end : length $CONTENT), '');
 
@@ -95,17 +94,24 @@ while (length($CONTENT) > 0) {
     # try to do something sensible with the formatting command
     # if debugging is enabled, output the codes that are changing
     # to try to help figure our what they may be doing
-    if ($opcode) {
+    if ($formatting) {
         my $lead = "";
+        my $byte = 0;
 
-        my $byte = ord $face_or_size;
+        $byte = ord $font;
         if ($DEBUGGING) {
             $lead .= $byte == 0  || $byte == $last_byte[0]
                         ? "." : sprintf("\\x%02X", $byte);
             $last_byte[0] = $byte;
         }
 
-        $byte = ord $size_or_face;
+
+        $byte = ord $size;
+        # 0x01 = tall text
+        if ($byte == 0x02) {
+            # this is wide text
+            $text =~ s/(.)/ $1 /g
+        }
         if ($DEBUGGING) {
             $lead .= $byte == 0 || $byte == $last_byte[1]
                         ? "." : sprintf("\\x%02X", $byte);
@@ -114,19 +120,32 @@ while (length($CONTENT) > 0) {
 
         $byte = ord $style;
         if ($byte & 0x01) {
-            # assume this is bolding
-            $text = "$C{bold_on}$text$C{bold_off}";
-            $byte &= ~0x01;
+            # this is bold text
+            $text  = "$C{bold_on}$text$C{bold_off}";
         }
         if ($byte & 0x02) {
-            # assume this is italicizing
-            $text = "$C{italic_on}$text$C{italic_off}";
-            $byte &= ~0x02;
+            # this is italic text
+            $text  = "$C{italic_on}$text$C{italic_off}";
+        }
+        if ($byte & 0x04) {
+            # this is underline text
+            $text  = "$C{under_on}$text$C{under_off}";
+        }
+        if ($byte & 0x08) {
+            # this is drop-shadow text
+            # can't reproduce here, so just make it faint
+            $text  = "$C{faint_on}$text$C{faint_off}";
         }
         if ($byte & 0x10) {
-            # assume this is underlining
-            $text = "$C{under_on}$text$C{under_off}";
-            $byte &= ~0x10;
+            # this is outline text
+            # can't reproduce here, so just make it bold
+            $text  = "$C{bold_on}$text$C{bold_off}";
+        }
+        # 0x20 = subscript
+        # 0x40 = superscript
+        if ($byte & 0x80) {
+            # this is inverse text
+            $text  = "$C{inverse_on}$text$C{inverse_off}";
         }
         if ($DEBUGGING) {
             $lead .= $byte == 0 || $byte == $last_byte[2]

@@ -72,7 +72,7 @@ file_type_table_t  file_type_table =
     ADD_FILE_TYPE(0x08,  nullptr,   nullptr),
     ADD_FILE_TYPE(0x09,  nullptr,   nullptr),
     ADD_FILE_TYPE(0x0A,  nullptr,   nullptr),
-    ADD_FILE_TYPE(0x0B,  nullptr,   nullptr),
+    ADD_FILE_TYPE(0x0B,  "WPF",     "Word processor file"),
     ADD_FILE_TYPE(0x0C,  nullptr,   nullptr),
     ADD_FILE_TYPE(0x0D,  nullptr,   nullptr),
     ADD_FILE_TYPE(0x0E,  nullptr,   nullptr),

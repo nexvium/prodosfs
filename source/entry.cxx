@@ -62,7 +62,7 @@ timestamp_t::AsString() const
                                      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
     if (month < 1 || month > 12) {
-        return { "" };
+        return { "<NO DATE>" };
     }
 
     sprintf(buffer, "%02d-%3s-%02d %02d:%02d",

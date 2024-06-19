@@ -11,30 +11,53 @@ $| = 1;
 
 my $MAX_FILE_SIZE = (1 << 24) - 1;
 my %COLOR = (
-    bold_on      => "\e[1m",    bold_off      => "\e[22m",
-    faint_on     => "\e[2m",    faint_off     => "\e[22m",
-    italic_on    => "\e[3m",    italic_off    => "\e[23m",
-    under_on     => "\e[4m",    under_off     => "\e[24m",
-    blink_on     => "\e[5m",    blink_off     => "\e[25m",
-    blink2_on    => "\e[6m",    blink2_off    => "\e[26m",
-    inverse_on   => "\e[7m",    inverse_off   => "\e[27m",
-    invisible_on => "\e[8m",    invisible_off => "\e[28m",
-    strikeout_on => "\e[9m",    strikeout_off => "\e[29m",
+    bold_on      => "\e[1m",        bold_off      => "\e[22m",
+    faint_on     => "\e[2m",        faint_off     => "\e[22m",
+    italic_on    => "\e[3m",        italic_off    => "\e[23m",
+    under_on     => "\e[4m",        under_off     => "\e[24m",
+    blink_on     => "\e[5m",        blink_off     => "\e[25m",
+    blink2_on    => "\e[6m",        blink2_off    => "\e[26m",
+    inverse_on   => "\e[7m",        inverse_off   => "\e[27m",
+    invisible_on => "\e[8m",        invisible_off => "\e[28m",
+    strikeout_on => "\e[9m",        strikeout_off => "\e[29m",
+    color_on     => "\e[1;36m",     color_off     => "\e[22;39m",
 );
 my %PLAIN = (
-    bold_on      => "",     bold_off      => "",
-    faint_on     => "",     faint_off     => "",
-    italic_on    => "",     italic_off    => "",
-    under_on     => "",     under_off     => "",
-    blink_on     => "",     blink_off     => "",
-    blink2_on    => "",     blink2_off    => "",
-    inverse_on   => "",     inverse_off   => "",
-    invisible_on => "",     invisible_off => "",
-    strikeout_on => "",     strikeout_off => "",
+    bold_on      => "",             bold_off      => "",
+    faint_on     => "",             faint_off     => "",
+    italic_on    => "",             italic_off    => "",
+    under_on     => "",             under_off     => "",
+    blink_on     => "",             blink_off     => "",
+    blink2_on    => "",             blink2_off    => "",
+    inverse_on   => "",             inverse_off   => "",
+    invisible_on => "",             invisible_off => "",
+    strikeout_on => "",             strikeout_off => "",
+    color_on     => "",             color_off     => "",
 );
 my %C = %COLOR;
 my $WIDTH = $ENV{COLUMNS} || 120;
-my $DEBUGGING = 1;
+my %OPT = ();
+
+GetOptions(\%OPT, "help|h", "plain!", "debug|d") or exit(1);
+if ($OPT{help}) {
+    print <<USAGE ;
+usage:  $0 [opts] <file>
+
+options:
+
+    -h --help           print usage message
+       --[no-]plain     preserve (or not) bold, underline, etc
+    -d --debug          output debugging messages to stderr
+USAGE
+}
+
+if ($OPT{plain} || (! -t STDOUT && ! defined $OPT{plain})) {
+    %C = %PLAIN;
+}
+
+if ($OPT{debug}) {
+    $| = 1;
+}
 
 if (@ARGV < 1) {
     print STDERR "$0: no file specified\n";
@@ -99,7 +122,13 @@ while (length($CONTENT) > 0) {
         my $byte = 0;
 
         $byte = ord $font;
-        if ($DEBUGGING) {
+        if ($byte > 0) {
+            # this is a font selection
+            # can't reproduce it here, so just change text color
+            # there's not enough distinct colors to represent each font
+            $text = "$C{color_on}$text$C{color_off}";
+        }
+        if ($OPT{debug}) {
             $lead .= $byte == 0  || $byte == $last_byte[0]
                         ? "." : sprintf("\\x%02X", $byte);
             $last_byte[0] = $byte;
@@ -112,7 +141,7 @@ while (length($CONTENT) > 0) {
             # this is wide text
             $text =~ s/(.)/ $1 /g
         }
-        if ($DEBUGGING) {
+        if ($OPT{debug}) {
             $lead .= $byte == 0 || $byte == $last_byte[1]
                         ? "." : sprintf("\\x%02X", $byte);
             $last_byte[1] = $byte;
@@ -121,39 +150,39 @@ while (length($CONTENT) > 0) {
         $byte = ord $style;
         if ($byte & 0x01) {
             # this is bold text
-            $text  = "$C{bold_on}$text$C{bold_off}";
+            $text = "$C{bold_on}$text$C{bold_off}";
         }
         if ($byte & 0x02) {
             # this is italic text
-            $text  = "$C{italic_on}$text$C{italic_off}";
+            $text = "$C{italic_on}$text$C{italic_off}";
         }
         if ($byte & 0x04) {
             # this is underline text
-            $text  = "$C{under_on}$text$C{under_off}";
+            $text = "$C{under_on}$text$C{under_off}";
         }
         if ($byte & 0x08) {
             # this is drop-shadow text
             # can't reproduce here, so just make it faint
-            $text  = "$C{faint_on}$text$C{faint_off}";
+            $text = "$C{faint_on}$text$C{faint_off}";
         }
         if ($byte & 0x10) {
             # this is outline text
             # can't reproduce here, so just make it bold
-            $text  = "$C{bold_on}$text$C{bold_off}";
+            $text = "$C{bold_on}$text$C{bold_off}";
         }
         # 0x20 = subscript
         # 0x40 = superscript
         if ($byte & 0x80) {
             # this is inverse text
-            $text  = "$C{inverse_on}$text$C{inverse_off}";
+            $text = "$C{inverse_on}$text$C{inverse_off}";
         }
-        if ($DEBUGGING) {
+        if ($OPT{debug}) {
             $lead .= $byte == 0 || $byte == $last_byte[2]
                         ? "." : sprintf("\\x%02X", $byte);
             $last_byte[2] = $byte;
         }
 
-        if ($DEBUGGING) {
+        if ($OPT{debug}) {
             $lead = "" if ($lead eq '...');
             print "$C{faint_on}\[$lead\]$C{faint_off}";
         }

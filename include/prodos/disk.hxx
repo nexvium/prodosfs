@@ -49,15 +49,26 @@ public:
     enum convert_t { RWTS_TO_BLOCK };
     void Convert(convert_t direction);
 
+    // Write the disk to a file (e.g. after it has been converted).
+    // Returns false on failure.
+    bool Save(const std::string & pathname) const;
+
     // Given a memory address, this returns the image byte offset, or -1 if not in the image.
     // Used for logging and debugging.
     ssize_t ToOffset(const void * addr) const;
 
+    // Return true if the in-memory image has been modified.
+    bool    IsDirty() const
+    {
+        return _dirty;
+    }
+
 private:
-    void *      _base;
-    size_t      _size;
-    unsigned    _num_blocks;
-    bool        _converted;
+    void *      _base       = nullptr;
+    size_t      _size       = 0;
+    unsigned    _num_blocks = 0;
+    bool        _converted  = false;
+    bool        _dirty      = false;
 
     void _ReadRwtsBlock(size_t index, void * block);
 };

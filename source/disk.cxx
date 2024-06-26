@@ -28,7 +28,6 @@ const int   BLOCKS_PER_TRACK    = SECTORS_PER_TRACK / 2;
 #define SECTOR_ADDR(i)  ((char *)_base + (i) * SECTOR_SIZE)
 
 disk_t::disk_t(const std::string & pathname)
-    : _base(nullptr), _size(0), _num_blocks(0), _converted(false)
 {
     int fd = open(pathname.c_str(), O_RDONLY);
     if (fd < 0) {
@@ -84,6 +83,8 @@ disk_t::WriteBlock(int index, const void * block)
     }
 
     memcpy(BLOCK_ADDR(index), block, BLOCK_SIZE);
+
+    _dirty = true;
 }
 
 const void *
@@ -147,6 +148,18 @@ disk_t::ToOffset(const void * addr) const
     }
 
     return offset;
+}
+
+bool disk_t::Save(const std::string & pathname) const
+{
+    int fd = open(pathname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+    if (fd < 0) {
+        return false;
+    }
+
+    liberator_t<int, int (*)(int)>  defer_close(fd, close);
+
+    return write(fd, _base, _size) == _size;
 }
 
 } // namespace

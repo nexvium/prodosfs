@@ -36,3 +36,16 @@ add_executable(
     source/util.cxx
     source/volume.cxx
 )
+
+add_executable(
+    prodosify
+
+    util/prodosify.cxx
+    source/directory.cxx
+    source/disk.cxx
+    source/entry.cxx
+    source/file.cxx
+    source/filetype.cxx
+    source/util.cxx
+    source/volume.cxx
+)

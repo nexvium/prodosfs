@@ -91,6 +91,18 @@ public:
     // Return a directory listing formated like ProDOS's CATALOG command.
     std::string *     Catalog(const std::string & pathname) const;
 
+    // Return true if the underlying disk has been modified.
+    bool    IsDirty()  const
+    {
+        return _disk.IsDirty();
+    }
+
+    // Write the underlying disk to a file. Returns false on failure.
+    bool    Save(const std::string & pathname) const
+    {
+        return _disk.Save(pathname);
+    }
+
 private:
     disk_t                      _disk;
     const directory_block *     _root;

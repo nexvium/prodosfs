@@ -35,8 +35,8 @@ A few options are supported:
 
 * `-h` to output a usage message
 * `-f` to run in the foreground instead of backgrounding itself
-* `-d` to enable fuse debugging (implies `-f`)
-* `-n` to mount in `<mount dir>/<volume name>` instead of `<mount dir>`
+* `-d` to enable FUSE debugging (implies `-f`)
+* `-n` to mount in `<mount dir>/<volume name>` instead of in `<mount dir>`
 * `-lN` to set the log level to N (0 = least, 9 = most)
 
 For example:
@@ -47,7 +47,7 @@ $ build/prodosfs -f -l3 -n /mnt/prodos /path/to/image/file
 
 Log messages are written to `stderr` when in the foreground, `/tmp/<image name>.log` when in the background.
 
-The image contents are accessible until the `prodosfs` program exits, either due to an unexpected error, a signal, or the mount directory being unmounted with `umount`.
+The image contents are accessible until the `prodosfs` program exits, either due to an unexpected error, a signal, or the directory being unmounted with `umount`.
 
 ## Extended attributes
 
@@ -69,7 +69,7 @@ prodos.version="8"
 
 ## Pseudo-files
 
-The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which exists implicitly in every directory. It can be read to view the directory contents in a similar format to the output of the ProdDOS `CATALOG` command:
+The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which can be read in any directory to view a directory listing in a similar format to the output of the ProdDOS `CATALOG` command:
 
 ```
 $ cat APPLEWORKS/.CATALOG
@@ -92,16 +92,17 @@ BLOCKS FREE:    2          BLOCKS USED:  278          TOTAL BLOCKS:  280
 
 ## Utilities
 
-The `util/` directory contains small programs that may be useful for working with files on the mounted disks. Two currently exist.
+The `util/` directory contains small programs that may be useful for working with files on the mounted disks or the disk images themselves. Three currently exist.
 
 * `awp2txt`: Convert an AppleWorks word processor file to text.
-* `unk2txt`: Convert some unknown word processor file to text.
+* `wpf2txt`: Convert a MultiScribe word processor file to text.
+* `prodosify`: Write disk image to disk if it required modifications (e.g. converting from track-and-sector to block-oriented) in order to mount.
 
 # To Do
 
-- [ ] Comment code more
+- [ ] Comment code more.
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
-- [ ] Add option to use file type as file extension
-- [ ] Add option to disable ProDOS-to-Unix text file translation
-- [ ] Add option to control pseudo-files support
+- [ ] Add option to use file type as file extension.
+- [ ] Add option to disable ProDOS-to-Unix text file translation.
+- [ ] Add option to control pseudo-files support.
 - [ ] Write utility to de-tokenize Applesoft BASIC programs to text

@@ -2,14 +2,11 @@
 
 A mountable read-only filesystem for Apple II ProDOS 8 disk images.
 
-> [!NOTE]
-> This project is under development and incomplete.
-
-# Description
+## Description
 
 prodosfs is a [FUSE](https://github.com/libfuse/libfuse) filesystem that allows mounting images of Apple II ProDOS 8 disks in Linux for read-only access. Once mounted, the ProDOS files and directories can be viewed with standard GNU/Linux tools (ls, cat, etc).
 
-## Limitations
+### Limitations
 
 This software was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
 
@@ -17,7 +14,7 @@ This is only intended for the ProDOS disks used on the 8-bit Apple II series (i.
 
 Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are few protections against misuse, unintentional or otherwise.
 
-# Build
+## Build
 
 This is a cmake-based project. Building it should be as simple as:
 
@@ -27,7 +24,7 @@ $ cd build
 $ cmake ..
 ```
 
-# Usage
+## Usage
 
 Two arguments are required: a mount directory and an image file path.
 
@@ -49,7 +46,7 @@ Log messages are written to `stderr` when in the foreground, `/tmp/<image name>.
 
 The image contents are accessible until the `prodosfs` program exits, either due to an unexpected error, a signal, or the directory being unmounted with `umount`.
 
-## Extended attributes
+### Extended attributes
 
 Many ProDOS filesystem properties that do not obviously map to similar POSIX properties (e.g. file creation date and time) are accessible as extended attributes in a `prodos` namespace. For example:
 
@@ -67,7 +64,7 @@ prodos.min_version="0"
 prodos.version="8"
 ```
 
-## Pseudo-files
+### Pseudo-files
 
 The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which can be read in any directory to view a directory listing in a similar format to the output of the ProdDOS `CATALOG` command:
 
@@ -90,7 +87,7 @@ BLOCKS FREE:    2          BLOCKS USED:  278          TOTAL BLOCKS:  280
 
 ```
 
-## Utilities
+### Utilities
 
 The `util/` directory contains small programs that may be useful for working with files on the mounted disks or the disk images themselves. Three currently exist.
 
@@ -98,7 +95,7 @@ The `util/` directory contains small programs that may be useful for working wit
 * `wpf2txt`: Convert a MultiScribe word processor file to text.
 * `prodosify`: Write disk image to disk if it required modifications (e.g. converting from track-and-sector to block-oriented) in order to mount.
 
-# To Do
+## To Do
 
 - [ ] Comment code more.
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.

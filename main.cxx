@@ -41,6 +41,14 @@ enum text_mode_t
 
 static text_mode_t text_mode = text_mode_unix;
 
+enum extension_mode_t
+{
+    extension_mode_off,
+    extension_mode_on,
+};
+
+static extension_mode_t extension_mode = extension_mode_off;
+
 enum pseudo_file_mode_t
 {
     pseudo_file_mode_none,
@@ -137,6 +145,28 @@ static std::string S_AuxTypeToString(uint16_t aux_type)
     return { buffer };
 }
 
+static std::string S_ExportedFilename(const directory_entry_t * entry)
+{
+    std::string name = entry->FileName();
+    if (extension_mode == extension_mode_on && entry->IsFile()) {
+        auto file_type = GetFileTypeInfo(entry->FileType());
+        name += ":";
+        name += file_type->name;
+    }
+    return name;
+}
+
+static std::string S_ProdosFilename(const std::string & pathname)
+{
+    std::string name = pathname;
+    size_t pos = -1;
+    if (extension_mode == extension_mode_on && (pos = name.rfind(':')) != std::string::npos) {
+        name.erase(pos, name.length());
+    }
+    return name;
+}
+
+
 inline std::string XATTR(const char *name)
 {
     return std::string("prodos.") + name;
@@ -207,6 +237,7 @@ static void S_Cleanup()
 static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_info *fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p, %p)", path, st, fi);
+    std::string filename = S_ProdosFilename(path);
 
     if (pseudo_file_mode != pseudo_file_mode_none) {
         auto id = S_PseudoFileId(path);
@@ -219,7 +250,7 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
         }
     }
 
-    auto entry = volume->GetEntry(path);
+    auto entry = volume->GetEntry(filename);
     if (entry == nullptr) {
         return -S_ToError(volume_t::Error());
     }
@@ -257,11 +288,12 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
 static int prodosfs_open(const char *path, struct fuse_file_info * fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
+    std::string filename = S_ProdosFilename(path);
 
     if (pseudo_file_mode != pseudo_file_mode_none) {
-        auto id = S_PseudoFileId(path);
+        auto id = S_PseudoFileId(filename);
         if (id == pseudo_file_id_catalog) {
-            auto catalog = volume->Catalog(path);
+            auto catalog = volume->Catalog(filename);
             fi->fh = reinterpret_cast<uintptr_t>(catalog);
             return 0;
         }
@@ -270,7 +302,7 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
         }
     }
 
-    auto fh = volume->OpenFile(path);
+    auto fh = volume->OpenFile(filename);
     if (fh == nullptr) {
         return -S_ToError(volume_t::Error());
     }
@@ -366,8 +398,9 @@ static int prodosfs_getxattr(const char *path, const char *name, char *value, si
 static int prodosfs_listxattr(const char *path, char *buffer, size_t size)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_listxattr(\"%s\", %p, %zd)", path, buffer, size);
+    std::string pathname = S_ProdosFilename(path);
 
-    auto entry = volume->GetEntry(path);
+    auto entry = volume->GetEntry(pathname);
     if (entry == nullptr) {
         return -S_ToError(volume_t::Error());
     }
@@ -470,7 +503,7 @@ static int prodosfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     auto dh = reinterpret_cast<directory_handle_t *>(fi->fh);
     const entry_t * entry = nullptr;
     while ((entry = dh->NextEntry()) != nullptr) {
-        std::string name = entry->FileName();
+        std::string name = S_ExportedFilename((directory_entry_t *)entry);
         S_LogMessage(LOG_DEBUG2, "found entry: %s", name.c_str());
         if (filler(buf, name.c_str(), nullptr, 0, FUSE_FILL_DIR_PLUS)) {
             S_LogMessage(LOG_WARNING, "readdir buffer full");
@@ -569,18 +602,20 @@ static void S_HandleOptions(int argc, char *argv[])
 {
     opterr = 0;
     int c = 0;
-    while ((c = getopt(argc, argv, "dfhl:n")) != -1) {
+    while ((c = getopt(argc, argv, "defhl:n")) != -1) {
         switch (c) {
         case 'd':
             debug = true;
+            break;
+        case 'e':
+            extension_mode = extension_mode_on;
             break;
         case 'f':
             foreground = true;
             break;
         case 'h':
-            fprintf(stdout, "usage: prodosfs [-l N] [-d] [-f] [-n] <mount dir> <image file>\n");
+            fprintf(stdout, "usage: prodosfs [-l N] [-d] [-e] [-f] [-n] <mount dir> <image file>\n");
             exit(EXIT_SUCCESS);
-            break;
         case 'l':
             log_level = atoi(optarg);
             if (log_level < LOG_CRITICAL || log_level > LOG_MAX) {

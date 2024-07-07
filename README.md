@@ -33,6 +33,7 @@ A few options are supported:
 * `-h` to output a usage message
 * `-f` to run in the foreground instead of backgrounding itself
 * `-d` to enable FUSE debugging (implies `-f`)
+* `-e` to enable including the file type as an ":<type>" extension in the file name
 * `-n` to mount in `<mount dir>/<volume name>` instead of in `<mount dir>`
 * `-lN` to set the log level to N (0 = least, 9 = most)
 
@@ -99,7 +100,7 @@ The `util/` directory contains small programs that may be useful for working wit
 
 - [ ] Comment code more.
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
-- [ ] Add option to use file type as file extension.
+- [X] Add option to use file type as file extension.
 - [ ] Add option to disable ProDOS-to-Unix text file translation.
 - [ ] Add option to control pseudo-files support.
 - [ ] Write utility to de-tokenize Applesoft BASIC programs to text

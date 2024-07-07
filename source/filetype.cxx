@@ -38,7 +38,7 @@ S_CreateFileTypeInfo(uint8_t type, const char * name = nullptr, const char * des
 
     char name_buffer[8] = {};
     if (name == nullptr) {
-        sprintf(name_buffer, "$%02X", type);
+        sprintf(name_buffer, "%02X", type);
         name = name_buffer;
     }
 

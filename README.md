@@ -10,7 +10,7 @@ prodosfs is a [FUSE](https://github.com/libfuse/libfuse) filesystem that allows 
 
 This software was written to allow to recovery of the author's 30+-year-old files. As such, it is by no means intended to be a full, polished implementation of a ProDOS filesystem. Only functionality required to read one or more of the author's 5&#188;&#8243; floppy disk images is implemented.
 
-This is only intended for the ProDOS disks used on the 8-bit Apple II series (i.e. IIe, IIc, etc) _not_ ones used on the 16-bit Apple IIgs (ProDOS 16).
+This is only intended for the ProDOS disks used on the 8-bit Apple II series (i.e. IIe, IIc, etc), _not_ ones used on the 16-bit Apple IIgs (ProDOS 16).
 
 Since it is intended mainly for personal use on small disks, there has been little effort spent on performance or security. There are few protections against misuse, unintentional or otherwise.
 
@@ -31,7 +31,7 @@ Two arguments are required: a mount directory and an image file path.
 A few options are supported:
 
 * `-h` to output a usage message
-* `-f` to run in the foreground instead of backgrounding itself
+* `-f` to stay in the foreground instead of backgrounding itself
 * `-d` to enable FUSE debugging (implies `-f`)
 * `-e` to enable including the file type as an ":<type>" extension in the file name
 * `-n` to mount in `<mount dir>/<volume name>` instead of in `<mount dir>`
@@ -65,9 +65,9 @@ prodos.min_version="0"
 prodos.version="8"
 ```
 
-### Pseudo-files
+### Generated files
 
-The file system includes support for fake or synthetic files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which can be read in any directory to view a directory listing in a similar format to the output of the ProdDOS `CATALOG` command:
+The file system includes support for files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which can be read in any directory to view a directory listing in a similar format to the output of the ProdDOS `CATALOG` command:
 
 ```
 $ cat APPLEWORKS/.CATALOG
@@ -94,7 +94,7 @@ The `util/` directory contains small programs that may be useful for working wit
 
 * `awp2txt`: Convert an AppleWorks word processor file to text.
 * `wpf2txt`: Convert a MultiScribe word processor file to text.
-* `prodosify`: Write disk image to disk if it required modifications (e.g. converting from track-and-sector to block-oriented) in order to mount.
+* `diskutil`: Support a few simple operations on disks. This is the only program than can actually modify a disk image (e.g. rename a volume).
 
 ## To Do
 
@@ -102,5 +102,5 @@ The `util/` directory contains small programs that may be useful for working wit
 - [ ] ~~Mount as read-only~~ Seems FUSE does not support this.
 - [X] Add option to use file type as file extension.
 - [ ] Add option to disable ProDOS-to-Unix text file translation.
-- [ ] Add option to control pseudo-files support.
+- [ ] Add option to control generated files support.
 - [ ] Write utility to de-tokenize Applesoft BASIC programs to text

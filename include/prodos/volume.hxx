@@ -97,6 +97,9 @@ public:
         return _disk.IsDirty();
     }
 
+    // Change the volume name.
+    bool    Rename(const std::string & name);
+
     // Write the underlying disk to a file. Returns false on failure.
     bool    Save(const std::string & pathname) const
     {
@@ -104,10 +107,10 @@ public:
     }
 
 private:
-    disk_t                      _disk;
-    const directory_block *     _root;
+    disk_t              _disk;
+    directory_block *   _root;
 
-    const directory_block *     _GetVolumeDirectoryBlock();
+    directory_block *   _GetVolumeDirectoryBlock();
 };
 
 } // namespace

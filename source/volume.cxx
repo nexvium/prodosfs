@@ -11,12 +11,14 @@
 #include "prodos/filetype.hxx"
 #include "prodos/util.hxx"
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 
 #include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -140,7 +142,7 @@ volume_t::ClearError()
     error = err_none;
 }
 
-const directory_block *
+directory_block *
 volume_t::_GetVolumeDirectoryBlock()
 {
     const void *    block   = _disk.ReadBlock(2);
@@ -162,6 +164,18 @@ volume_t::_GetVolumeDirectoryBlock()
     if (S_IsVolumeDirectoryBlock(block)) {
         LOG(LOG_INFO, "converting track-and-sector disk to block disk");
         _disk.Convert(disk_t::RWTS_TO_BLOCK);
+        return (directory_block *)_disk.ReadBlock(2);
+    }
+
+    S_Deobfuscate(block, tmp_blk);
+    if (S_IsVolumeDirectoryBlock(tmp_blk)) {
+        LOG(LOG_INFO, "converting track-and-sector disk to block disk");
+        _disk.Convert(disk_t::RWTS_TO_BLOCK);
+
+        block = _disk.ReadBlock(2);
+        S_Deobfuscate(block, tmp_blk);
+        LOG(LOG_INFO, "deobfuscated protected disk");
+        _disk.WriteBlock(2, tmp_blk);
         return (directory_block *)_disk.ReadBlock(2);
     }
 
@@ -375,6 +389,25 @@ volume_t::Catalog(const std::string & pathname) const
     delete dh;
 
     return output;
+}
+
+bool volume_t::Rename(const std::string & name)
+{
+    if (!IsValidName(name)) {
+        return false;
+    }
+
+    std::string s = name;
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c){ return std::toupper(c); });
+
+    memset(_root->key.header.volume_name, 0, FILENAME_LENGTH);
+    memcpy(_root->key.header.volume_name, s.c_str(), FILENAME_LENGTH);
+    _root->key.header.storage_type_and_name_length &= 0b1111'0000;
+    _root->key.header.storage_type_and_name_length |= s.length();
+    _disk.WriteBlock(2, _root);
+
+    return true;
 }
 
 } // namespace

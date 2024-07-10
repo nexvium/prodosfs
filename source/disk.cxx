@@ -152,14 +152,24 @@ disk_t::ToOffset(const void * addr) const
 
 bool disk_t::Save(const std::string & pathname) const
 {
-    int fd = open(pathname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+    std::string tempname = pathname + ".tmp";
+
+    int fd = open(tempname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
         return false;
     }
 
-    liberator_t<int, int (*)(int)>  defer_close(fd, close);
+    size_t n = write(fd, _base, _size);
+    if (n != _size) {
+        throw std::runtime_error(strerror(errno));
+    }
 
-    return write(fd, _base, _size) == _size;
+    close(fd);
+    if (rename(tempname.c_str(), pathname.c_str()) != 0) {
+        throw std::runtime_error(strerror(errno));
+    }
+
+    return true;
 }
 
 } // namespace

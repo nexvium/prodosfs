@@ -38,9 +38,9 @@ add_executable(
 )
 
 add_executable(
-    prodosify
+    diskutil
 
-    util/prodosify.cxx
+    util/diskutil.cxx
     source/directory.cxx
     source/disk.cxx
     source/entry.cxx

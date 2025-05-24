@@ -65,7 +65,7 @@ prodos.min_version="0"
 prodos.version="8"
 ```
 
-### Generated files
+### Virtual files
 
 The file system includes support for files that don't actually exist in the disk image but are generated dynamically. The only such file currently is `.CATALOG`, which can be read in any directory to view a directory listing in a similar format to the output of the ProdDOS `CATALOG` command:
 
@@ -94,7 +94,7 @@ The `util/` directory contains small programs that may be useful for working wit
 
 * `awp2txt`: Convert an AppleWorks word processor file to text.
 * `wpf2txt`: Convert a MultiScribe word processor file to text.
-* `diskutil`: Support a few simple operations on disks. This is the only program than can actually modify a disk image (e.g. rename a volume).
+* `diskutil`: Support a few simple operations on disks. This is the only program that can actually modify a disk image (e.g., rename a volume).
 
 ## To Do
 

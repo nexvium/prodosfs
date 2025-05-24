@@ -49,24 +49,24 @@ enum extension_mode_t
 
 static extension_mode_t extension_mode = extension_mode_off;
 
-enum pseudo_file_mode_t
+enum virtual_file_mode_t
 {
-    pseudo_file_mode_none,
-    pseudo_file_mode_hidden,
-    pseudo_file_mode_visible,
+    virtual_file_mode_none,
+    virtual_file_mode_hidden,
+    virtual_file_mode_visible,
 };
 
-static pseudo_file_mode_t pseudo_file_mode = pseudo_file_mode_hidden;
+static virtual_file_mode_t virtual_file_mode = virtual_file_mode_hidden;
 
-enum pseudo_file_id_t
+enum virtual_file_id_t
 {
-    pseudo_file_id_none,
-    pseudo_file_id_catalog
+    virtual_file_id_none,
+    virtual_file_id_catalog
 };
 
-static std::unordered_map<std::string, pseudo_file_id_t> pseudo_files
+static std::unordered_map<std::string, virtual_file_id_t> virtual_files
 {
-    { ".CATALOG", pseudo_file_id_catalog },
+    { ".CATALOG", virtual_file_id_catalog },
 };
 
 //================================================================================================
@@ -212,15 +212,15 @@ static attributes_t S_GetAttributes(const entry_t * entry)
     return attributes;
 }
 
-static pseudo_file_id_t S_PseudoFileId(const std::string & pathanme)
+static virtual_file_id_t S_VirtualFileId(const std::string & pathanme)
 {
     auto filename = std::filesystem::path(pathanme).filename();
-    auto pseudo_file = pseudo_files.find(filename);
-    if (pseudo_file == pseudo_files.end()) {
-        return pseudo_file_id_none;
+    auto virtual_file = virtual_files.find(filename);
+    if (virtual_file == virtual_files.end()) {
+        return virtual_file_id_none;
     }
 
-    return pseudo_file->second;
+    return virtual_file->second;
 }
 
 static void S_Cleanup()
@@ -239,9 +239,9 @@ static int prodosfs_getattr(const char *path, struct stat *st, struct fuse_file_
     S_LogMessage(LOG_DEBUG1, "prodosfs_getattr(\"%s\", %p, %p)", path, st, fi);
     std::string filename = S_ProdosFilename(path);
 
-    if (pseudo_file_mode != pseudo_file_mode_none) {
-        auto id = S_PseudoFileId(path);
-        if (id != pseudo_file_id_none) {
+    if (virtual_file_mode != virtual_file_mode_none) {
+        auto id = S_VirtualFileId(path);
+        if (id != virtual_file_id_none) {
             st->st_mode = S_IFREG | S_IRUSR | S_IRGRP;
             // The size is unknown, but it seems fuse won't call read()
             // if the size is returned here is zero.
@@ -290,15 +290,15 @@ static int prodosfs_open(const char *path, struct fuse_file_info * fi)
     S_LogMessage(LOG_DEBUG1, "prodosfs_open(\"%s\", %p)", path, fi);
     std::string filename = S_ProdosFilename(path);
 
-    if (pseudo_file_mode != pseudo_file_mode_none) {
-        auto id = S_PseudoFileId(filename);
-        if (id == pseudo_file_id_catalog) {
+    if (virtual_file_mode != virtual_file_mode_none) {
+        auto id = S_VirtualFileId(filename);
+        if (id == virtual_file_id_catalog) {
             auto catalog = volume->Catalog(filename);
             fi->fh = reinterpret_cast<uintptr_t>(catalog);
             return 0;
         }
-        else if (id != pseudo_file_id_none) {
-            throw std::logic_error("unexpected pseudo file id");
+        else if (id != virtual_file_id_none) {
+            throw std::logic_error("unexpected virtual file id");
         }
     }
 
@@ -316,9 +316,9 @@ static int prodosfs_read(const char *path, char *buf, size_t bufsiz, off_t off, 
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_read(\"%s\", %zd, %p)", path, off, fi);
 
-    if (pseudo_file_mode != pseudo_file_mode_none) {
-        auto id = S_PseudoFileId(path);
-        if (id != pseudo_file_id_none) {
+    if (virtual_file_mode != virtual_file_mode_none) {
+        auto id = S_VirtualFileId(path);
+        if (id != virtual_file_id_none) {
             auto data = reinterpret_cast<std::string *>(fi->fh);
             return (int)data->copy(buf, bufsiz, off);
         }
@@ -352,9 +352,9 @@ static int prodosfs_close(const char *path, struct fuse_file_info *fi)
 {
     S_LogMessage(LOG_DEBUG1, "prodosfs_close(\"%s\", %p)", path, fi);
 
-    if (pseudo_file_mode != pseudo_file_mode_none) {
-        auto id = S_PseudoFileId(path);
-        if (id != pseudo_file_id_none) {
+    if (virtual_file_mode != virtual_file_mode_none) {
+        auto id = S_VirtualFileId(path);
+        if (id != virtual_file_id_none) {
             auto data = reinterpret_cast<std::string *>(fi->fh);
             delete data;
             return 0;
